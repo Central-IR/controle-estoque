@@ -539,22 +539,22 @@ window.viewProduct = function(id) {
                     <h3 class="modal-title">Detalhes do Produto</h3>
                     <button class="close-btn" onclick="closeViewProductModal()">✕</button>
                 </div>
-                <div style="background: var(--input-bg); padding: 1rem; border-radius: 8px;">
+                <div style="background: var(--input-bg); padding: 1rem; border-radius: 8px; overflow-wrap: break-word;">
                     <div class="info-line">
                         <span class="info-label">Código de Estoque:</span>
                         <span class="info-value"><strong>${String(produto.codigo).padStart(6, '0')}</strong></span>
                     </div>
                     <div class="info-line">
                         <span class="info-label">Código do Fornecedor:</span>
-                        <span class="info-value">${produto.codigo_fornecedor}</span>
+                        <span class="info-value" style="word-break: break-all;">${produto.codigo_fornecedor}</span>
                     </div>
                     <div class="info-line">
                         <span class="info-label">Marca:</span>
                         <span class="info-value"><strong>${produto.marca}</strong></span>
                     </div>
-                    <div class="info-line">
+                    <div class="info-line" style="align-items: flex-start;">
                         <span class="info-label">Descrição:</span>
-                        <span class="info-value">${produto.descricao}</span>
+                        <span class="info-value" style="word-break: break-all; text-align: right;">${produto.descricao}</span>
                     </div>
                     <div class="info-line">
                         <span class="info-label">Quantidade:</span>
