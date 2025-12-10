@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Estoque</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Splash Screen -->
+    <div class="splash-screen" id="splashScreen">
+        <h1 class="splash-title">Estoque</h1>
+    </div>
+
+    <!-- Conteúdo Principal -->
+    <div class="app-content">
+        <div class="container">
+            <div class="header">
+                <h1>Estoque</h1>
+                <div id="connectionStatus" class="connection-status offline">
+                    <span class="status-dot"></span>
+                </div>
+            </div>
+
+            <div id="statusMessage" class="hidden"></div>
+
+            <div class="card">
+                <div style="margin-bottom: 1.5rem;">
+                    <label style="display: block; margin-bottom: 1rem; font-weight: 600; color: var(--text-primary);">
+                        Filtrar por Marca:
+                    </label>
+                    <div id="marcasFilter" style="display: flex; gap: 0.75rem; flex-wrap: wrap;"></div>
+                </div>
+                <div class="filter-section">
+                    <div class="form-group">
+                        <label for="search">Pesquisar</label>
+                        <input type="text" id="search" placeholder="Código, marca, descrição..." oninput="filterProducts()">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Botão de Relatório PDF -->
+            <div style="display: flex; justify-content: flex-end; margin-bottom: 1rem;">
+                <button onclick="generateInventoryPDF()" class="pdf-btn" title="Gerar Relatório PDF">
+                    📄 Relatório de Inventário
+                </button>
+            </div>
+
+            <div class="card">
+                <div id="estoqueContainer"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Botão Flutuante -->
+    <button onclick="toggleForm()" class="floating-add-btn" title="Adicionar Produto">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+    </button>
+
+    <script>
+        // Esconder splash após 3 segundos
+        setTimeout(() => {
+            const splash = document.getElementById('splashScreen');
+            if (splash) splash.style.display = 'none';
+        }, 3000);
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
