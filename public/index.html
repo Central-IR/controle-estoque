@@ -3,20 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Estoque</title>
+    <title>Sistema de Estoque</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <!-- Splash Screen -->
     <div class="splash-screen" id="splashScreen">
-        <h1 class="splash-title">Estoque</h1>
+        <h1 class="splash-title">Sistema de Estoque</h1>
     </div>
 
     <!-- Conteúdo Principal -->
     <div class="app-content">
         <div class="container">
             <div class="header">
-                <h1>Estoque</h1>
+                <h1>Sistema de Estoque</h1>
                 <div id="connectionStatus" class="connection-status offline">
                     <span class="status-dot"></span>
                 </div>
@@ -39,20 +39,18 @@
                 </div>
             </div>
 
-            <!-- Botão de Relatório PDF -->
-            <div style="display: flex; justify-content: flex-end; margin-bottom: 1rem;">
-                <button onclick="generateInventoryPDF()" class="pdf-btn" title="Gerar Relatório PDF">
-                    📄 Relatório de Inventário
-                </button>
-            </div>
-
             <div class="card">
                 <div id="estoqueContainer"></div>
             </div>
         </div>
     </div>
 
-    <!-- Botão Flutuante -->
+    <!-- Botão Flutuante PDF (cinza) - acima do botão de cadastro -->
+    <button onclick="generateInventoryPDF()" class="floating-pdf-btn" title="Gerar Relatório PDF">
+        📄
+    </button>
+
+    <!-- Botão Flutuante Cadastro (azul) -->
     <button onclick="toggleForm()" class="floating-add-btn" title="Adicionar Produto">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <line x1="12" y1="5" x2="12" y2="19"></line>
