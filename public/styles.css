@@ -277,7 +277,7 @@ button.small { padding: 8px 12px; font-size: 0.85rem; }
 }
 
 .actions-cell { 
-    white-space: nowrap;
+    white-space: nowrap !important;
     display: flex;
     gap: 4px;
     justify-content: center;
@@ -310,6 +310,10 @@ td {
     border-bottom: 1px solid var(--border-color);
     font-size: 0.9rem;
     color: var(--text-primary);
+    word-wrap: break-word;
+    word-break: break-word;
+    white-space: normal;
+    max-width: 300px;
 }
 
 tbody tr { background: var(--bg-card); }
@@ -467,6 +471,8 @@ tbody tr:hover { background: var(--table-hover); }
     justify-content: space-between;
     padding: 0.5rem 0;
     border-bottom: 1px solid var(--border-color);
+    gap: 1rem;
+    align-items: flex-start;
 }
 
 .info-line:last-child { border-bottom: none; }
@@ -474,10 +480,17 @@ tbody tr:hover { background: var(--table-hover); }
 .info-label {
     font-weight: 600;
     color: var(--text-secondary);
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .info-value {
     color: var(--text-primary);
+    word-wrap: break-word;
+    word-break: break-word;
+    white-space: normal;
+    text-align: right;
+    max-width: 350px;
 }
 
 /* BOTÕES FLUTUANTES */
