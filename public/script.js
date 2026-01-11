@@ -151,6 +151,29 @@ async function loadProducts() {
     }
 }
 
+// Sincronização manual
+window.sincronizarManual = async function() {
+    if (!isOnline) {
+        showMessage('Sistema offline', 'error');
+        return;
+    }
+
+    const btn = document.querySelector('.sync-btn');
+    if (btn) {
+        btn.style.pointerEvents = 'none';
+        btn.querySelector('svg').style.animation = 'spin 1s linear infinite';
+    }
+
+    await loadProducts();
+    showMessage('Dados sincronizados com sucesso', 'success');
+
+    if (btn) {
+        btn.style.pointerEvents = 'auto';
+        btn.querySelector('svg').style.animation = 'none';
+    }
+};
+
+
 function startPolling() {
     loadProducts();
     setInterval(() => {
@@ -228,8 +251,8 @@ function renderTable(produtosExibir) {
                 <td class="actions-cell">
                     <button onclick="viewProduct('${p.id}')" class="action-btn view">Ver</button>
                     <button onclick="editProduct('${p.id}')" class="action-btn edit">Editar</button>
-                    <button onclick="showMovimentacaoModal('${p.id}')" class="action-btn entrada">Movimentar</button>
-                    <button onclick="deleteProduct('${p.id}')" class="action-btn delete">Excluir</button>
+                    <button onclick="showEntradaModal('${p.id}')" class="action-btn entrada">Entrada</button>
+                    <button onclick="showSaidaModal('${p.id}')" class="action-btn saida">Saída</button>
                 </td>
             </tr>
         `;
@@ -435,51 +458,9 @@ window.editProduct = function(id) {
     showFormModal(id);
 };
 
-window.deleteProduct = async function(id) {
-    const produto = produtos.find(p => String(p.id) === String(id));
-    if (!produto) {
-        showMessage('Produto não encontrado', 'error');
-        return;
-    }
 
-    const confirmado = await showConfirm(
-        `Deseja realmente excluir o produto "${produto.descricao}"?`,
-        'Excluir Produto'
-    );
-
-    if (!confirmado) return;
-
-    if (!isOnline) {
-        showMessage('Sistema offline', 'error');
-        return;
-    }
-
-    try {
-        const response = await fetch(`${API_URL}/estoque/${id}`, {
-            method: 'DELETE',
-            headers: {
-                'X-Session-Token': sessionToken
-            }
-        });
-
-        if (response.status === 401) {
-            sessionStorage.removeItem('estoqueSession');
-            mostrarTelaAcessoNegado('Sua sessão expirou');
-            return;
-        }
-
-        if (!response.ok) throw new Error('Erro ao excluir');
-
-        await loadProducts();
-        showMessage('Produto excluído com sucesso', 'success');
-    } catch (error) {
-        console.error('Erro:', error);
-        showMessage('Erro ao excluir produto', 'error');
-    }
-};
-
-// MOVIMENTAÇÃO DE ESTOQUE
-window.showMovimentacaoModal = function(id) {
+// ENTRADA DE ESTOQUE
+window.showEntradaModal = function(id) {
     const produto = produtos.find(p => String(p.id) === String(id));
     if (!produto) {
         showMessage('Produto não encontrado', 'error');
@@ -490,21 +471,20 @@ window.showMovimentacaoModal = function(id) {
         <div class="modal-overlay show">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h2 class="modal-title">Movimentar Estoque</h2>
-                    <button onclick="closeMovimentacaoModal()" class="close-btn" style="background: none; border: none; font-size: 1.5rem; color: var(--text-secondary); cursor: pointer; padding: 0; margin: 0; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 4px;">&times;</button>
+                    <h2 class="modal-title">Entrada de Estoque</h2>
+                    <button onclick="closeEntradaModal()" class="close-btn" style="background: none; border: none; font-size: 1.5rem; color: var(--text-secondary); cursor: pointer; padding: 0; margin: 0; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 4px;">&times;</button>
                 </div>
                 <div style="margin: 1.5rem 0;">
                     <p style="color: var(--text-primary); margin-bottom: 1rem;"><strong>Produto:</strong> ${produto.descricao}</p>
                     <p style="color: var(--text-primary); margin-bottom: 1.5rem;"><strong>Estoque atual:</strong> ${produto.quantidade}</p>
                     <div class="form-group">
-                        <label for="quantidade_mov">Quantidade</label>
-                        <input type="number" id="quantidade_mov" min="1" value="1" required>
+                        <label for="quantidade_entrada">Quantidade a Adicionar *</label>
+                        <input type="number" id="quantidade_entrada" min="1" value="1" required>
                     </div>
                 </div>
                 <div class="modal-actions">
-                    <button onclick="closeMovimentacaoModal()" class="secondary">Cancelar</button>
-                    <button onclick="movimentarEstoque('${id}', 'entrada')" class="action-btn entrada">Entrada</button>
-                    <button onclick="movimentarEstoque('${id}', 'saida')" class="action-btn saida">Saída</button>
+                    <button onclick="closeEntradaModal()" class="secondary">Cancelar</button>
+                    <button onclick="confirmarEntrada('${id}')" class="action-btn entrada">Confirmar Entrada</button>
                 </div>
             </div>
         </div>
@@ -513,7 +493,7 @@ window.showMovimentacaoModal = function(id) {
     document.body.insertAdjacentHTML('beforeend', modalHTML);
 };
 
-function closeMovimentacaoModal() {
+function closeEntradaModal() {
     const modal = document.querySelector('.modal-overlay');
     if (modal) {
         modal.style.animation = 'modalFadeOut 0.2s ease forwards';
@@ -521,8 +501,8 @@ function closeMovimentacaoModal() {
     }
 }
 
-window.movimentarEstoque = async function(id, tipo) {
-    const quantidade = parseInt(document.getElementById('quantidade_mov').value);
+window.confirmarEntrada = async function(id) {
+    const quantidade = parseInt(document.getElementById('quantidade_entrada').value);
 
     if (!quantidade || quantidade <= 0) {
         showMessage('Quantidade inválida', 'error');
@@ -541,7 +521,7 @@ window.movimentarEstoque = async function(id, tipo) {
                 'Content-Type': 'application/json',
                 'X-Session-Token': sessionToken
             },
-            body: JSON.stringify({ tipo, quantidade })
+            body: JSON.stringify({ tipo: 'entrada', quantidade })
         });
 
         if (response.status === 401) {
@@ -552,12 +532,104 @@ window.movimentarEstoque = async function(id, tipo) {
 
         if (!response.ok) {
             const error = await response.json();
-            throw new Error(error.error || 'Erro ao movimentar');
+            throw new Error(error.error || 'Erro ao registrar entrada');
         }
 
         await loadProducts();
-        closeMovimentacaoModal();
-        showMessage(`${tipo === 'entrada' ? 'Entrada' : 'Saída'} registrada com sucesso`, 'success');
+        closeEntradaModal();
+        showMessage('Entrada registrada com sucesso', 'success');
+    } catch (error) {
+        console.error('Erro:', error);
+        showMessage(error.message, 'error');
+    }
+};
+
+// SAÍDA DE ESTOQUE
+window.showSaidaModal = function(id) {
+    const produto = produtos.find(p => String(p.id) === String(id));
+    if (!produto) {
+        showMessage('Produto não encontrado', 'error');
+        return;
+    }
+
+    const modalHTML = `
+        <div class="modal-overlay show">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 class="modal-title">Saída de Estoque</h2>
+                    <button onclick="closeSaidaModal()" class="close-btn" style="background: none; border: none; font-size: 1.5rem; color: var(--text-secondary); cursor: pointer; padding: 0; margin: 0; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 4px;">&times;</button>
+                </div>
+                <div style="margin: 1.5rem 0;">
+                    <p style="color: var(--text-primary); margin-bottom: 1rem;"><strong>Produto:</strong> ${produto.descricao}</p>
+                    <p style="color: var(--text-primary); margin-bottom: 1.5rem;"><strong>Estoque atual:</strong> <span style="color: var(--success-color); font-weight: 700;">${produto.quantidade}</span></p>
+                    <div class="form-group">
+                        <label for="quantidade_saida">Quantidade a Retirar *</label>
+                        <input type="number" id="quantidade_saida" min="1" max="${produto.quantidade}" value="1" required>
+                        <small style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 0.25rem; display: block;">Máximo disponível: ${produto.quantidade}</small>
+                    </div>
+                </div>
+                <div class="modal-actions">
+                    <button onclick="closeSaidaModal()" class="secondary">Cancelar</button>
+                    <button onclick="confirmarSaida('${id}')" class="action-btn saida">Confirmar Saída</button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+};
+
+function closeSaidaModal() {
+    const modal = document.querySelector('.modal-overlay');
+    if (modal) {
+        modal.style.animation = 'modalFadeOut 0.2s ease forwards';
+        setTimeout(() => modal.remove(), 200);
+    }
+}
+
+window.confirmarSaida = async function(id) {
+    const produto = produtos.find(p => String(p.id) === String(id));
+    const quantidade = parseInt(document.getElementById('quantidade_saida').value);
+
+    if (!quantidade || quantidade <= 0) {
+        showMessage('Quantidade inválida', 'error');
+        return;
+    }
+
+    if (quantidade > produto.quantidade) {
+        showMessage(`Quantidade insuficiente em estoque. Disponível: ${produto.quantidade}`, 'error');
+        return;
+    }
+
+    if (!isOnline) {
+        showMessage('Sistema offline', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_URL}/estoque/${id}/movimentar`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Session-Token': sessionToken
+            },
+            body: JSON.stringify({ tipo: 'saida', quantidade })
+        });
+
+        if (response.status === 401) {
+            sessionStorage.removeItem('estoqueSession');
+            mostrarTelaAcessoNegado('Sua sessão expirou');
+            return;
+        }
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Erro ao registrar saída');
+        }
+
+        await loadProducts();
+        closeSaidaModal();
+        showMessage('Saída registrada com sucesso', 'success');
     } catch (error) {
         console.error('Erro:', error);
         showMessage(error.message, 'error');
