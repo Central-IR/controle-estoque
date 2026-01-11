@@ -1,391 +1,764 @@
-require('dotenv').config();
-const express = require('express');
-const cors = require('cors');
-const path = require('path');
-const fs = require('fs');
-const { createClient } = require('@supabase/supabase-js');
-
-const app = express();
-const PORT = process.env.PORT || 3002;
-
-// CONFIGURAÇÃO DO SUPABASE
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-if (!supabaseUrl || !supabaseKey) {
-    console.error('❌ ERRO: Variáveis de ambiente do Supabase não configuradas');
-    process.exit(1);
+/* VARIÁVEIS BASE - IDÊNTICAS A TRANSPORTADORAS */
+:root {
+    --primary: #CC7000;
+    --bg-primary: #FFFFFF;
+    --bg-secondary: #F8F9FA;
+    --bg-card: #FFFFFF;
+    --text-primary: #1A1A1A;
+    --text-secondary: #6B7280;
+    --border-color: #E5E7EB;
+    --input-bg: #F9FAFB;
+    --success-color: #22C55E;
+    --warning-color: #F59E0B;
+    --info-color: #3B82F6;
+    --table-stripe: #FAFAFA;
+    --table-hover: rgba(0, 0, 0, 0.02);
+    --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    --th-bg: #6B7280;
+    --th-color: #FFFFFF;
+    --th-border: #E5E7EB;
+    --shadow: rgba(0, 0, 0, 0.08);
+    --btn-register: #3B82F6;
+    --btn-delete: #EF4444;
+    --btn-edit: #6B7280;
+    --btn-view: #F59E0B;
+    --btn-save: #22C55E;
+    --alert-color: #EF4444;
 }
 
-const supabase = createClient(supabaseUrl, supabaseKey);
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg-primary: #000000;
+        --bg-secondary: #000000c7;
+        --bg-card: #1A1A1A;
+        --text-primary: #FFFFFF;
+        --text-secondary: #A0A0A0;
+        --border-color: rgba(204, 112, 0, 0.08);
+        --input-bg: #2A2A2A;
+        --table-stripe: #1F1F1F;
+        --card-shadow: none;
+        --th-bg: #4A4A4A;
+        --th-color: #FFFFFF;
+        --th-border: #5A5A5A;
+        --shadow: rgba(0, 0, 0, 0.3);
+        --table-hover: rgba(128, 128, 128, 0.15);
+    }
+}
 
-// MIDDLEWARES
-app.use(cors({
-    origin: '*',
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'HEAD', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Session-Token']
-}));
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+body {
+    font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    line-height: 1.6;
+    overflow-y: scroll;
+}
 
-// REGISTRO DE ACESSOS SILENCIOSO
-const logFilePath = path.join(__dirname, 'acessos.log');
-let accessCount = 0;
-let uniqueIPs = new Set();
+/* LOADER */
+.loader {
+    width: 48px;
+    height: 48px;
+    border: 4px solid rgba(204, 112, 0, 0.2);
+    border-top-color: #CC7000;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
 
-function registrarAcesso(req, res, next) {
-    const xForwardedFor = req.headers['x-forwarded-for'];
-    const clientIP = xForwardedFor
-        ? xForwardedFor.split(',')[0].trim()
-        : req.socket.remoteAddress;
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
 
-    const cleanIP = clientIP.replace('::ffff:', '');
-    const logEntry = `[${new Date().toISOString()}] ${cleanIP} - ${req.method} ${req.path}\n`;
+/* ============================================
+   SPLASH SCREEN
+   ============================================ */
+.splash-screen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: var(--bg-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 99999;
+    animation: splashFadeOut 0.5s ease 2.5s forwards;
+}
 
-    // Salva no arquivo (silencioso)
-    fs.appendFile(logFilePath, logEntry, () => {});
+@keyframes splashFadeOut {
+    to { 
+        opacity: 0; 
+        visibility: hidden; 
+    }
+}
+
+.app-content {
+    opacity: 0;
+    animation: contentFadeIn 0.5s ease 2.5s forwards;
+}
+
+@keyframes contentFadeIn {
+    to { opacity: 1; }
+}
+
+.container {
+    max-width: 1800px;
+    margin: 0 auto;
+    padding: 2rem 2rem 5rem 2rem;
+}
+
+.card {
+    background: var(--bg-card);
+    padding: 1.5rem;
+    border-radius: 12px;
+    margin-bottom: 1.5rem;
+    border: 1px solid var(--border-color);
+    box-shadow: var(--card-shadow);
+}
+
+.table-card {
+    padding: 0;
+    overflow: hidden;
+}
+
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: -0.5px;
+    display: flex;
+    align-items: center;
+    margin: 0;
+}
+
+h2 {
+    font-size: 1.5rem;
+    margin-bottom: 1.5rem;
+    color: var(--text-primary);
+}
+
+h3 {
+    font-size: 1.1rem;
+    margin-bottom: 0.75rem;
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+/* STATUS DE CONEXÃO */
+.connection-status {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 1rem;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+}
+
+.connection-status.online .status-dot {
+    background-color: #22C55E;
+    animation: pulse-online 2s infinite;
+}
+
+.connection-status.offline .status-dot {
+    background-color: #EF4444;
+    animation: pulse-offline 2s infinite;
+}
+
+@keyframes pulse-online {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
+    70% { box-shadow: 0 0 0 8px rgba(34, 197, 94, 0); }
+}
+
+@keyframes pulse-offline {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+    70% { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
+}
+
+/* BOTÃO NO HEADER */
+.btn-new-order-header {
+    background: var(--btn-register);
+    color: white;
+    border: none;
+    padding: 0.65rem 1.5rem;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    transition: all 0.3s ease;
+    box-shadow: 0 1px 3px rgba(59, 130, 246, 0.3);
+    white-space: nowrap;
+}
+
+.btn-new-order-header:hover {
+    background: #2563EB;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(59, 130, 246, 0.4);
+}
+
+/* FILTRO DE MARCAS */
+.filter-section {
+    margin-bottom: 1rem;
+}
+
+#marcasFilter {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.brand-button {
+    background: var(--input-bg);
+    color: var(--text-primary);
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    border: 1px solid var(--border-color);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin: 0;
+}
+
+.brand-button:hover {
+    border-color: var(--primary);
+    background: rgba(204, 112, 0, 0.05);
+}
+
+.brand-button.active {
+    background: #6B7280;
+    color: white;
+    border-color: #4B5563;
+}
+
+/* SEARCH BAR */
+.search-bar-wrapper {
+    margin-bottom: 0.5rem;
+}
+
+.search-bar {
+    background: var(--bg-card);
+    padding: 0.75rem 1rem;
+    border-radius: 12px 12px 0 0;
+    border: 1px solid var(--border-color);
+    border-bottom: none;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.search-icon {
+    color: var(--text-secondary);
+    flex-shrink: 0;
+}
+
+.search-bar input {
+    flex: 1;
+    border: none;
+    background: transparent;
+    padding: 0.5rem;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    font-family: inherit;
+    min-width: 150px;
+}
+
+.search-bar input:focus {
+    outline: none;
+}
+
+.search-bar input::placeholder {
+    color: var(--text-secondary);
+}
+
+/* BOTÃO DE SINCRONIZAÇÃO */
+.sync-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 0.5rem;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    margin: 0;
+    flex-shrink: 0;
+}
+
+.sync-btn:hover {
+    background: var(--input-bg);
+    color: var(--primary);
+}
+
+.sync-btn svg {
+    transition: transform 0.3s ease;
+}
+
+.sync-btn:active svg {
+    transform: rotate(180deg);
+}
+
+/* TABLE */
+table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+thead {
+    background: var(--th-bg);
+}
+
+th {
+    padding: 14px 16px;
+    text-align: left;
+    font-weight: 600;
+    color: var(--th-color);
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid var(--th-border);
+}
+
+td {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 0.9rem;
+    color: var(--text-primary);
+}
+
+tbody tr {
+    background: var(--bg-card);
+    transition: background 0.2s ease;
+}
+
+tbody tr:nth-child(even) {
+    background: var(--table-stripe);
+}
+
+tbody tr:hover {
+    background: var(--table-hover);
+}
+
+.actions-cell {
+    white-space: nowrap;
+    min-width: 200px;
+}
+
+/* FORM & BUTTONS */
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.2rem;
+    margin-bottom: 1.5rem;
+}
+
+.form-group {
+    margin-bottom: 1rem;
+}
+
+label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 500;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+}
+
+input, select, textarea {
+    width: 100%;
+    padding: 12px 16px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--input-bg);
+    color: var(--text-primary);
+    font-size: 0.95rem;
+    font-family: inherit;
+    transition: all 0.2s ease;
+}
+
+textarea {
+    resize: vertical;
+    min-height: 100px;
+}
+
+input:focus, select:focus, textarea:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
+button {
+    background: var(--primary);
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin-right: 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    transition: all 0.3s ease;
+}
+
+button:hover:not(:disabled) {
+    opacity: 0.9;
+    transform: translateY(-1px);
+}
+
+button:disabled {
+    background: #9CA3AF;
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+button.register {
+    background: var(--btn-register);
+}
+
+button.danger, button.delete, .action-btn.delete {
+    background: var(--btn-delete);
+}
+
+button.edit, .action-btn.edit {
+    background: var(--btn-edit);
+}
+
+button.view, .action-btn.view {
+    background: var(--btn-view);
+}
+
+button.success, button.save, button[type="submit"] {
+    background: var(--btn-save);
+}
+
+button.secondary {
+    background: #6B7280;
+}
+
+button.small {
+    padding: 8px 12px;
+    font-size: 0.85rem;
+}
+
+.action-btn {
+    padding: 8px 12px;
+    font-size: 0.85rem;
+    margin: 0 4px;
+    min-width: 70px;
+}
+
+/* FLOATING MESSAGES */
+.floating-message {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    padding: 14px 20px;
+    border-radius: 10px;
+    font-weight: 500;
+    font-size: 0.95rem;
+    z-index: 9999999;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    border: 1px solid;
+    animation: slideInBottom 0.3s ease;
+    min-width: 300px;
+}
+
+.floating-message.success {
+    background: #10B981;
+    color: #FFFFFF;
+    border-color: #059669;
+}
+
+.floating-message.error {
+    background: #EF4444;
+    color: #FFFFFF;
+    border-color: #DC2626;
+}
+
+@keyframes slideInBottom {
+    from {
+        opacity: 0;
+        transform: translateY(100px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes slideOut {
+    to {
+        opacity: 0;
+        transform: translateY(100px);
+    }
+}
+
+/* MODAL */
+.modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    opacity: 0;
+    animation: modalFadeIn 0.2s ease forwards;
+}
+
+.modal-overlay.show {
+    display: flex;
+}
+
+@keyframes modalFadeIn {
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes modalFadeOut {
+    to {
+        opacity: 0;
+    }
+}
+
+.modal-content {
+    background: var(--bg-card);
+    border-radius: 16px;
+    padding: 2rem;
+    max-width: 900px;
+    width: 95%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px var(--shadow);
+    border: 1px solid var(--border-color);
+    transform: scale(0.9);
+    animation: scaleIn 0.2s ease forwards;
+}
+
+.modal-content.large {
+    max-width: 1000px;
+}
+
+@keyframes scaleIn {
+    to {
+        transform: scale(1);
+    }
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid var(--border-color);
+}
+
+.modal-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.modal-message {
+    margin: 1.5rem 0;
+    color: var(--text-primary);
+    font-size: 1rem;
+    line-height: 1.6;
+}
+
+.modal-actions {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: flex-end;
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 2px solid var(--border-color);
+}
+
+.modal-actions button {
+    margin: 0;
+    min-width: 120px;
+}
+
+.modal-form-content {
+    margin-top: 1rem;
+}
+
+.hidden {
+    display: none !important;
+}
+
+/* BOTÃO FLUTUANTE PDF */
+.floating-pdf-btn {
+    position: fixed;
+    bottom: 7rem;
+    right: 2rem;
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: #6B7280;
+    color: white;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(107, 114, 128, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    z-index: 1000;
+    padding: 0;
+    margin: 0;
+}
+
+.floating-pdf-btn:hover {
+    transform: scale(1.1);
+    box-shadow: 0 6px 20px rgba(107, 114, 128, 0.6);
+    background: #4B5563;
+}
+
+.floating-pdf-btn:active {
+    transform: scale(0.95);
+}
+
+.floating-pdf-btn svg {
+    width: 28px;
+    height: 28px;
+}
+
+/* RESPONSIVE */
+@media (max-width: 768px) {
+    .container {
+        padding: 0 1rem 5rem 1rem;
+        margin: 1rem auto;
+    }
     
-    // Conta acessos (sem mostrar)
-    accessCount++;
-    uniqueIPs.add(cleanIP);
+    .header {
+        flex-direction: column;
+        align-items: stretch;
+    }
     
-    next();
-}
-
-app.use(registrarAcesso);
-
-// Relatório periódico (opcional - a cada 1 hora)
-setInterval(() => {
-    if (accessCount > 0) {
-        console.log(`📊 Última hora: ${accessCount} requisições de ${uniqueIPs.size} IPs únicos`);
-        accessCount = 0;
-        uniqueIPs.clear();
+    .header-left {
+        width: 100%;
+        justify-content: space-between;
     }
-}, 3600000); // 1 hora
-
-// AUTENTICAÇÃO
-const PORTAL_URL = process.env.PORTAL_URL || 'https://ir-comercio-portal-zcan.onrender.com';
-
-async function verificarAutenticacao(req, res, next) {
-    const publicPaths = ['/', '/health', '/app'];
-    if (publicPaths.includes(req.path)) {
-        return next();
+    
+    .btn-new-order-header {
+        width: 100%;
+        justify-content: center;
     }
-
-    const sessionToken = req.headers['x-session-token'] || req.query.sessionToken;
-
-    if (!sessionToken) {
-        return res.status(401).json({
-            error: 'Não autenticado',
-            redirectToLogin: true
-        });
+    
+    h1 {
+        font-size: 1.5rem;
     }
-
-    try {
-        const verifyResponse = await fetch(`${PORTAL_URL}/api/verify-session`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ sessionToken })
-        });
-
-        if (!verifyResponse.ok) {
-            return res.status(401).json({
-                error: 'Sessão inválida',
-                redirectToLogin: true
-            });
-        }
-
-        const sessionData = await verifyResponse.json();
-
-        if (!sessionData.valid) {
-            return res.status(401).json({
-                error: 'Sessão inválida',
-                redirectToLogin: true
-            });
-        }
-
-        req.user = sessionData.session;
-        req.sessionToken = sessionToken;
-        next();
-    } catch (error) {
-        return res.status(500).json({
-            error: 'Erro ao verificar autenticação'
-        });
+    
+    .search-bar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.5rem;
     }
-}
-
-// ARQUIVOS ESTÁTICOS
-const publicPath = path.join(__dirname, 'public');
-
-app.use(express.static(publicPath, {
-    index: 'index.html',
-    dotfiles: 'deny',
-    setHeaders: (res, path) => {
-        if (path.endsWith('.html')) {
-            res.setHeader('Content-Type', 'text/html');
-        } else if (path.endsWith('.css')) {
-            res.setHeader('Content-Type', 'text/css');
-        } else if (path.endsWith('.js')) {
-            res.setHeader('Content-Type', 'application/javascript');
-        }
+    
+    .search-bar input {
+        width: 100%;
+        min-width: unset;
     }
-}));
-
-// HEALTH CHECK
-app.get('/health', async (req, res) => {
-    try {
-        const { error } = await supabase
-            .from('estoque')
-            .select('count', { count: 'exact', head: true });
-        
-        res.json({
-            status: error ? 'unhealthy' : 'healthy',
-            database: error ? 'disconnected' : 'connected',
-            timestamp: new Date().toISOString()
-        });
-    } catch (error) {
-        res.json({
-            status: 'unhealthy',
-            timestamp: new Date().toISOString()
-        });
+    
+    table {
+        font-size: 0.85rem;
     }
-});
-
-// ROTAS DA API
-app.use('/api', verificarAutenticacao);
-
-app.head('/api/estoque', (req, res) => {
-    res.status(200).end();
-});
-
-// Listar produtos
-app.get('/api/estoque', async (req, res) => {
-    try {
-        const { data, error } = await supabase
-            .from('estoque')
-            .select('*')
-            .order('marca', { ascending: true })
-            .order('codigo', { ascending: true });
-
-        if (error) throw error;
-        res.json(data || []);
-    } catch (error) {
-        res.status(500).json({ 
-            error: 'Erro ao buscar produtos'
-        });
+    
+    th, td {
+        padding: 10px 8px;
     }
-});
-
-// Buscar produto específico
-app.get('/api/estoque/:id', async (req, res) => {
-    try {
-        const { data, error } = await supabase
-            .from('estoque')
-            .select('*')
-            .eq('id', req.params.id)
-            .single();
-
-        if (error) {
-            return res.status(404).json({ error: 'Produto não encontrado' });
-        }
-        
-        res.json(data);
-    } catch (error) {
-        res.status(500).json({ 
-            error: 'Erro ao buscar produto'
-        });
+    
+    button {
+        padding: 10px 16px;
+        font-size: 0.9rem;
     }
-});
-
-// Criar produto
-app.post('/api/estoque', async (req, res) => {
-    try {
-        const { codigo_fornecedor, ncm, marca, descricao, quantidade, valor_unitario } = req.body;
-
-        if (!codigo_fornecedor || !marca || !descricao || quantidade === undefined || valor_unitario === undefined) {
-            return res.status(400).json({ error: 'Todos os campos obrigatórios devem ser preenchidos' });
-        }
-
-        // Verificar se código do fornecedor já existe
-        const { data: existing } = await supabase
-            .from('estoque')
-            .select('id')
-            .eq('codigo_fornecedor', codigo_fornecedor)
-            .single();
-
-        if (existing) {
-            return res.status(400).json({ error: 'Código do fornecedor já cadastrado' });
-        }
-
-        // Obter próximo código de estoque
-        const { data: maxData } = await supabase
-            .from('estoque')
-            .select('codigo')
-            .order('codigo', { ascending: false })
-            .limit(1)
-            .single();
-
-        const proximoCodigo = maxData ? maxData.codigo + 1 : 1;
-
-        const { data, error } = await supabase
-            .from('estoque')
-            .insert([{
-                codigo: proximoCodigo,
-                codigo_fornecedor: codigo_fornecedor.trim(),
-                ncm: ncm ? ncm.trim() : null,
-                marca: marca.trim().toUpperCase(),
-                descricao: descricao.trim().toUpperCase(),
-                quantidade: parseInt(quantidade),
-                valor_unitario: parseFloat(valor_unitario),
-                timestamp: new Date().toISOString()
-            }])
-            .select()
-            .single();
-
-        if (error) throw error;
-        res.status(201).json(data);
-    } catch (error) {
-        res.status(500).json({ 
-            error: 'Erro ao criar produto'
-        });
+    
+    .form-grid {
+        grid-template-columns: 1fr;
     }
-});
-
-// Atualizar produto
-app.put('/api/estoque/:id', async (req, res) => {
-    try {
-        const { codigo_fornecedor, ncm, descricao, valor_unitario } = req.body;
-
-        if (!codigo_fornecedor || !descricao || valor_unitario === undefined) {
-            return res.status(400).json({ error: 'Todos os campos obrigatórios devem ser preenchidos' });
-        }
-
-        const { data, error } = await supabase
-            .from('estoque')
-            .update({
-                codigo_fornecedor: codigo_fornecedor.trim(),
-                ncm: ncm ? ncm.trim() : null,
-                descricao: descricao.trim().toUpperCase(),
-                valor_unitario: parseFloat(valor_unitario),
-                timestamp: new Date().toISOString()
-            })
-            .eq('id', req.params.id)
-            .select()
-            .single();
-
-        if (error) {
-            return res.status(404).json({ error: 'Produto não encontrado' });
-        }
-        
-        res.json(data);
-    } catch (error) {
-        res.status(500).json({ 
-            error: 'Erro ao atualizar produto'
-        });
+    
+    .modal-content {
+        padding: 1.5rem;
+        width: 95%;
     }
-});
-
-// Movimentação de estoque (entrada/saída)
-app.post('/api/estoque/:id/movimentar', async (req, res) => {
-    try {
-        const { tipo, quantidade } = req.body;
-
-        if (!['entrada', 'saida'].includes(tipo) || !quantidade || quantidade <= 0) {
-            return res.status(400).json({ error: 'Dados inválidos' });
-        }
-
-        // Buscar produto atual
-        const { data: produto, error: fetchError } = await supabase
-            .from('estoque')
-            .select('*')
-            .eq('id', req.params.id)
-            .single();
-
-        if (fetchError || !produto) {
-            return res.status(404).json({ error: 'Produto não encontrado' });
-        }
-
-        // Calcular nova quantidade
-        let novaQuantidade = produto.quantidade;
-        if (tipo === 'entrada') {
-            novaQuantidade += parseInt(quantidade);
-        } else {
-            if (produto.quantidade < parseInt(quantidade)) {
-                return res.status(400).json({ error: 'Quantidade insuficiente em estoque' });
-            }
-            novaQuantidade -= parseInt(quantidade);
-        }
-
-        // Atualizar quantidade
-        const { data, error } = await supabase
-            .from('estoque')
-            .update({
-                quantidade: novaQuantidade,
-                timestamp: new Date().toISOString()
-            })
-            .eq('id', req.params.id)
-            .select()
-            .single();
-
-        if (error) throw error;
-        res.json(data);
-    } catch (error) {
-        res.status(500).json({ 
-            error: 'Erro ao movimentar estoque'
-        });
+    
+    .modal-actions {
+        flex-direction: column-reverse;
     }
-});
-
-// Deletar produto
-app.delete('/api/estoque/:id', async (req, res) => {
-    try {
-        const { error } = await supabase
-            .from('estoque')
-            .delete()
-            .eq('id', req.params.id);
-
-        if (error) throw error;
-        res.status(204).end();
-    } catch (error) {
-        res.status(500).json({ 
-            error: 'Erro ao excluir produto'
-        });
+    
+    .modal-actions button {
+        width: 100%;
     }
-});
-
-// ROTA PRINCIPAL
-app.get('/', (req, res) => {
-    res.sendFile(path.join(publicPath, 'index.html'));
-});
-
-app.get('/app', (req, res) => {
-    res.sendFile(path.join(publicPath, 'index.html'));
-});
-
-// 404
-app.use((req, res) => {
-    res.status(404).json({
-        error: '404 - Rota não encontrada'
-    });
-});
-
-// TRATAMENTO DE ERROS
-app.use((error, req, res, next) => {
-    res.status(500).json({
-        error: 'Erro interno do servidor'
-    });
-});
-
-// INICIAR SERVIDOR
-app.listen(PORT, '0.0.0.0', () => {
-    console.log(`✅ Servidor rodando na porta ${PORT}`);
-    console.log(`✅ Database: Conectado`);
-    console.log(`✅ Autenticação: Ativa`);
-    console.log(`📝 Logs salvos em: acessos.log\n`);
-});
-
-// Verificar pasta public
-if (!fs.existsSync(publicPath)) {
-    console.error('⚠️  Pasta public/ não encontrada!');
+    
+    .actions-cell {
+        min-width: auto;
+    }
+    
+    #marcasFilter {
+        gap: 0.4rem;
+    }
+    
+    .brand-button {
+        font-size: 0.8rem;
+        padding: 0.4rem 0.8rem;
+    }
+    
+    .floating-pdf-btn {
+        width: 56px;
+        height: 56px;
+        bottom: 6rem;
+        right: 1.5rem;
+    }
+    
+    .floating-pdf-btn svg {
+        width: 24px;
+        height: 24px;
+    }
 }
