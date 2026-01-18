@@ -9,7 +9,7 @@ let marcaSelecionada = 'TODAS';
 let marcasDisponiveis = new Set();
 let lastDataHash = '';
 let sessionToken = null;
-let autoSyncEnabled = true; // Novo: controle de sincronização automática
+let autoSyncEnabled = true;
 
 console.log('🚀 Estoque iniciado');
 console.log('📍 API URL:', API_URL);
@@ -49,18 +49,13 @@ function mostrarTelaAcessoNegado(mensagem = 'NÃO AUTORIZADO') {
 }
 
 async function inicializarApp() {
-    // Carregar dados iniciais
     await checkServerStatus();
-    
-    // Verificar conexão a cada 30 segundos (reduzido de 15s)
     setInterval(checkServerStatus, 30000);
-    
-    // Sincronização automática inteligente: apenas se houve mudanças
     setInterval(async () => {
         if (isOnline && autoSyncEnabled) {
-            await loadProducts(true); // Modo silencioso
+            await loadProducts(true);
         }
-    }, 60000); // A cada 1 minuto (reduzido de intervalos menores)
+    }, 60000);
 }
 
 async function checkServerStatus() {
@@ -77,7 +72,7 @@ async function checkServerStatus() {
         const timeoutId = setTimeout(() => controller.abort(), 10000);
 
         const response = await fetch(`${API_URL}/estoque`, {
-            method: 'HEAD', // HEAD ao invés de GET para ser mais rápido
+            method: 'HEAD',
             headers: headers,
             mode: 'cors',
             signal: controller.signal
@@ -115,7 +110,6 @@ function updateConnectionStatus() {
     }
 }
 
-// CARREGAR PRODUTOS (otimizado)
 async function loadProducts(silencioso = false) {
     if (!isOnline) return;
     
@@ -137,18 +131,15 @@ async function loadProducts(silencioso = false) {
 
         const data = await response.json();
         
-        // Verificar se houve mudanças (usando hash simples)
         const newHash = JSON.stringify(data.map(p => `${p.id}-${p.quantidade}`));
         
         if (newHash !== lastDataHash) {
             lastDataHash = newHash;
             produtos = data;
             
-            // Atualizar marcas disponíveis
             marcasDisponiveis.clear();
             produtos.forEach(p => marcasDisponiveis.add(p.marca));
             
-            // Atualizar interface
             renderMarcasFilter();
             filterProducts();
             
@@ -164,14 +155,13 @@ async function loadProducts(silencioso = false) {
     }
 }
 
-// SINCRONIZAÇÃO MANUAL (com animação)
 window.sincronizarManual = async function() {
     if (!isOnline) {
         showMessage('Sistema offline', 'error');
         return;
     }
 
-    const btn = document.querySelector('.sync-btn');
+    const btn = document.querySelector('.sync-btn:last-child');
     if (btn) {
         btn.style.pointerEvents = 'none';
         const svg = btn.querySelector('svg');
@@ -196,14 +186,12 @@ function renderMarcasFilter() {
 
     container.innerHTML = '';
 
-    // Botão TODAS
     const btnTodas = document.createElement('button');
     btnTodas.className = `brand-button ${marcaSelecionada === 'TODAS' ? 'active' : ''}`;
     btnTodas.textContent = 'TODAS';
     btnTodas.onclick = () => filtrarPorMarca('TODAS');
     container.appendChild(btnTodas);
 
-    // Botões de marcas
     Array.from(marcasDisponiveis).sort().forEach(marca => {
         const btn = document.createElement('button');
         btn.className = `brand-button ${marcaSelecionada === marca ? 'active' : ''}`;
@@ -224,12 +212,10 @@ function filterProducts() {
     
     let filtered = produtos;
 
-    // Filtro por marca
     if (marcaSelecionada !== 'TODAS') {
         filtered = filtered.filter(p => p.marca === marcaSelecionada);
     }
 
-    // Filtro por busca
     if (search) {
         filtered = filtered.filter(p =>
             p.codigo.toString().includes(search) ||
@@ -251,7 +237,6 @@ function renderTable(products) {
         return;
     }
 
-    // Renderização otimizada
     tbody.innerHTML = products.map(p => `
         <tr>
             <td><strong>${p.codigo}</strong></td>
@@ -271,7 +256,6 @@ function renderTable(products) {
 }
 
 // MODAL E FORMULÁRIO
-let currentForm = null;
 let editingProductId = null;
 
 window.toggleForm = function() {
@@ -335,9 +319,7 @@ window.saveProduct = async function(event) {
             throw new Error(error.error || 'Erro ao salvar');
         }
 
-        // Recarregar dados imediatamente
         await loadProducts();
-        
         closeFormModal();
         showMessage(editingProductId ? 'Produto atualizado' : 'Produto criado', 'success');
     } catch (error) {
@@ -361,16 +343,143 @@ window.deleteProduct = async function(id) {
 
         if (!response.ok) throw new Error('Erro ao excluir');
 
-        // Recarregar dados imediatamente
         await loadProducts();
-        
         showMessage('Produto excluído', 'success');
     } catch (error) {
         showMessage('Erro ao excluir produto', 'error');
     }
 };
 
-// MENSAGENS
+// GERAR PDF ORGANIZADO POR MARCA
+window.generateInventoryPDF = function() {
+    if (produtos.length === 0) {
+        showMessage('Nenhum produto para gerar relatório', 'error');
+        return;
+    }
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF('landscape');
+
+    // Título
+    doc.setFontSize(18);
+    doc.setFont(undefined, 'bold');
+    doc.text('RELATÓRIO DE ESTOQUE', 148, 15, { align: 'center' });
+
+    // Data e hora
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'normal');
+    const dataHora = new Date().toLocaleString('pt-BR');
+    doc.text(`Gerado em: ${dataHora}`, 148, 22, { align: 'center' });
+
+    // Organizar produtos por marca
+    const produtosPorMarca = {};
+    produtos.forEach(produto => {
+        if (!produtosPorMarca[produto.marca]) {
+            produtosPorMarca[produto.marca] = [];
+        }
+        produtosPorMarca[produto.marca].push(produto);
+    });
+
+    // Ordenar marcas alfabeticamente
+    const marcasOrdenadas = Object.keys(produtosPorMarca).sort();
+
+    let startY = 30;
+
+    marcasOrdenadas.forEach((marca, index) => {
+        // Verificar se precisa adicionar nova página
+        if (startY > 180) {
+            doc.addPage();
+            startY = 15;
+        }
+
+        // Nome da marca
+        doc.setFontSize(14);
+        doc.setFont(undefined, 'bold');
+        doc.setTextColor(204, 112, 0); // Cor laranja
+        doc.text(marca, 14, startY);
+        startY += 8;
+
+        // Ordenar produtos por código (crescente)
+        const produtosOrdenados = produtosPorMarca[marca].sort((a, b) => {
+            return parseInt(a.codigo) - parseInt(b.codigo);
+        });
+
+        // Preparar dados da tabela
+        const tableData = produtosOrdenados.map(p => [
+            p.codigo.toString(),
+            p.codigo_fornecedor,
+            p.ncm || '-',
+            p.descricao,
+            p.quantidade.toString(),
+            `R$ ${parseFloat(p.valor_unitario).toFixed(2)}`,
+            `R$ ${(p.quantidade * parseFloat(p.valor_unitario)).toFixed(2)}`
+        ]);
+
+        // Adicionar tabela
+        doc.autoTable({
+            startY: startY,
+            head: [['Código', 'Cód. Fornec.', 'NCM', 'Descrição', 'Qtd', 'Valor Un.', 'Valor Total']],
+            body: tableData,
+            theme: 'grid',
+            headStyles: {
+                fillColor: [107, 114, 128],
+                textColor: [255, 255, 255],
+                fontSize: 9,
+                fontStyle: 'bold'
+            },
+            bodyStyles: {
+                fontSize: 8,
+                textColor: [26, 26, 26]
+            },
+            alternateRowStyles: {
+                fillColor: [250, 250, 250]
+            },
+            columnStyles: {
+                0: { cellWidth: 20 },
+                1: { cellWidth: 30 },
+                2: { cellWidth: 25 },
+                3: { cellWidth: 100 },
+                4: { cellWidth: 20, halign: 'center' },
+                5: { cellWidth: 25, halign: 'right' },
+                6: { cellWidth: 30, halign: 'right' }
+            },
+            margin: { left: 14, right: 14 }
+        });
+
+        startY = doc.lastAutoTable.finalY + 12;
+    });
+
+    // Totais gerais na última página
+    const valorTotalGeral = produtos.reduce((acc, p) => {
+        return acc + (p.quantidade * parseFloat(p.valor_unitario));
+    }, 0);
+
+    const quantidadeTotalGeral = produtos.reduce((acc, p) => acc + p.quantidade, 0);
+
+    if (startY > 170) {
+        doc.addPage();
+        startY = 15;
+    }
+
+    doc.setFontSize(12);
+    doc.setFont(undefined, 'bold');
+    doc.setTextColor(0, 0, 0);
+    doc.text('TOTAIS GERAIS:', 14, startY);
+    startY += 8;
+
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'normal');
+    doc.text(`Total de Produtos: ${produtos.length}`, 14, startY);
+    startY += 6;
+    doc.text(`Quantidade Total: ${quantidadeTotalGeral}`, 14, startY);
+    startY += 6;
+    doc.text(`Valor Total em Estoque: R$ ${valorTotalGeral.toFixed(2)}`, 14, startY);
+
+    // Salvar PDF
+    doc.save(`Relatorio_Estoque_${new Date().toISOString().split('T')[0]}.pdf`);
+    showMessage('Relatório PDF gerado com sucesso!', 'success');
+};
+
 function showMessage(message, type = 'success') {
     const div = document.createElement('div');
     div.className = `floating-message ${type}`;
@@ -380,37 +489,4 @@ function showMessage(message, type = 'success') {
         div.style.animation = 'slideOut 0.3s ease forwards';
         setTimeout(() => div.remove(), 300);
     }, 2000);
-}
-
-function showConfirm(message, title = 'Confirmação') {
-    return new Promise((resolve) => {
-        const modalHTML = `
-            <div class="modal-overlay show">
-                <div class="modal-content compact">
-                    <div class="modal-header">
-                        <h3 class="modal-title">${title}</h3>
-                    </div>
-                    <p class="modal-message">${message}</p>
-                    <div class="modal-actions">
-                        <button class="secondary" onclick="closeConfirmModal(false)">Cancelar</button>
-                        <button class="danger" onclick="closeConfirmModal(true)">Confirmar</button>
-                    </div>
-                </div>
-            </div>
-        `;
-
-        document.body.insertAdjacentHTML('beforeend', modalHTML);
-
-        window.closeConfirmModal = function(result) {
-            const modal = document.querySelector('.modal-overlay');
-            if (modal) {
-                modal.style.animation = 'modalFadeOut 0.2s ease forwards';
-                setTimeout(() => {
-                    modal.remove();
-                    delete window.closeConfirmModal;
-                    resolve(result);
-                }, 200);
-            }
-        };
-    });
 }
