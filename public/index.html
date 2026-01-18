@@ -46,6 +46,18 @@
                         <path d="m21 21-4.35-4.35"></path>
                     </svg>
                     <input type="text" id="search" placeholder="Buscar por código, marca ou descrição..." oninput="filterProducts()">
+                    
+                    <!-- Botão PDF ao lado do Sincronizar -->
+                    <button class="sync-btn" onclick="generateInventoryPDF()" title="Gerar Relatório PDF">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                            <line x1="16" y1="13" x2="8" y2="13"></line>
+                            <line x1="16" y1="17" x2="8" y2="17"></line>
+                            <polyline points="10 9 9 9 8 9"></polyline>
+                        </svg>
+                    </button>
+                    
                     <button class="sync-btn" onclick="sincronizarManual()" title="Sincronizar">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                             <polyline points="23 4 23 10 17 10"></polyline>
@@ -80,16 +92,48 @@
         </div>
     </div>
 
-    <!-- Botão Flutuante PDF (cinza) - acima do botão de cadastro -->
-    <button onclick="generateInventoryPDF()" class="floating-pdf-btn" title="Gerar Relatório PDF">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-            <polyline points="14 2 14 8 20 8"></polyline>
-            <line x1="16" y1="13" x2="8" y2="13"></line>
-            <line x1="16" y1="17" x2="8" y2="17"></line>
-            <polyline points="10 9 9 9 8 9"></polyline>
-        </svg>
-    </button>
+    <!-- MODAL DE FORMULÁRIO -->
+    <div class="modal-overlay" id="formModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title" id="formTitle">Novo Produto</h3>
+            </div>
+            
+            <form id="productForm" onsubmit="saveProduct(event)">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="codigo_fornecedor">Código Fornecedor *</label>
+                        <input type="text" id="codigo_fornecedor" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="ncm">NCM</label>
+                        <input type="text" id="ncm">
+                    </div>
+                    <div class="form-group">
+                        <label for="marca">Marca *</label>
+                        <input type="text" id="marca" required>
+                    </div>
+                    <div class="form-group" style="grid-column: 1 / -1;">
+                        <label for="descricao">Descrição *</label>
+                        <textarea id="descricao" rows="3" required></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="quantidade">Quantidade *</label>
+                        <input type="number" id="quantidade" min="0" step="1" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="valor_unitario">Valor Unitário (R$) *</label>
+                        <input type="number" id="valor_unitario" min="0" step="0.01" required>
+                    </div>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" onclick="closeFormModal()" class="secondary">Cancelar</button>
+                    <button type="submit" class="success">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
     <!-- Script para remover splash screen -->
     <script>
