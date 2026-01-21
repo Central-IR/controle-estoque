@@ -210,20 +210,22 @@ function filtrarPorMarca(marca) {
 }
 
 function filterProducts() {
-    const search = document.getElementById('search').value.toLowerCase();
+    const search = document.getElementById('search');
+    if (!search) return;
     
+    const searchValue = search.value.toLowerCase();
     let filtered = produtos;
 
     if (marcaSelecionada !== 'TODAS') {
         filtered = filtered.filter(p => p.marca === marcaSelecionada);
     }
 
-    if (search) {
+    if (searchValue) {
         filtered = filtered.filter(p =>
-            p.codigo.toString().includes(search) ||
-            p.codigo_fornecedor.toLowerCase().includes(search) ||
-            p.marca.toLowerCase().includes(search) ||
-            p.descricao.toLowerCase().includes(search)
+            p.codigo.toString().includes(searchValue) ||
+            p.codigo_fornecedor.toLowerCase().includes(searchValue) ||
+            p.marca.toLowerCase().includes(searchValue) ||
+            p.descricao.toLowerCase().includes(searchValue)
         );
     }
 
@@ -262,12 +264,14 @@ function renderTable(products) {
 
 // TABS
 window.switchTab = function(tabName) {
+    const clickedBtn = event.target;
+    
     // Remover active de todos os botões e conteúdos
     document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
     
     // Adicionar active ao botão e conteúdo selecionado
-    event.target.classList.add('active');
+    clickedBtn.classList.add('active');
     document.getElementById(`tab-${tabName}`).classList.add('active');
 };
 
@@ -275,13 +279,20 @@ window.switchTab = function(tabName) {
 window.toggleForm = function() {
     editingProductId = null;
     document.getElementById('formTitle').textContent = 'Novo Produto';
-    document.getElementById('productForm').reset();
+    
+    // Resetar formulário
+    const form = document.getElementById('productForm');
+    if (form) form.reset();
     
     // Reset tabs
     document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-    document.querySelector('.tab-btn:first-child').classList.add('active');
-    document.getElementById('tab-fornecedor').classList.add('active');
+    
+    const firstTab = document.querySelector('.tab-btn:first-child');
+    if (firstTab) firstTab.classList.add('active');
+    
+    const fornecedorTab = document.getElementById('tab-fornecedor');
+    if (fornecedorTab) fornecedorTab.classList.add('active');
     
     document.getElementById('formModal').classList.add('show');
 };
@@ -304,6 +315,8 @@ window.editProduct = async function(id) {
 
     editingProductId = id;
     document.getElementById('formTitle').textContent = 'Editar Produto';
+    
+    // Preencher campos
     document.getElementById('codigo_fornecedor').value = produto.codigo_fornecedor;
     document.getElementById('ncm').value = produto.ncm || '';
     document.getElementById('marca').value = produto.marca;
@@ -315,8 +328,12 @@ window.editProduct = async function(id) {
     // Reset tabs
     document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-    document.querySelector('.tab-btn:first-child').classList.add('active');
-    document.getElementById('tab-fornecedor').classList.add('active');
+    
+    const firstTab = document.querySelector('.tab-btn:first-child');
+    if (firstTab) firstTab.classList.add('active');
+    
+    const fornecedorTab = document.getElementById('tab-fornecedor');
+    if (fornecedorTab) fornecedorTab.classList.add('active');
     
     document.getElementById('formModal').classList.add('show');
 };
@@ -324,14 +341,29 @@ window.editProduct = async function(id) {
 window.saveProduct = async function(event) {
     event.preventDefault();
 
+    // Garantir que todos os campos estão acessíveis
+    const codigoFornecedor = document.getElementById('codigo_fornecedor')?.value.trim();
+    const ncm = document.getElementById('ncm')?.value.trim();
+    const marca = document.getElementById('marca')?.value.trim();
+    const descricao = document.getElementById('descricao')?.value.trim();
+    const unidade = document.getElementById('unidade')?.value;
+    const quantidade = document.getElementById('quantidade')?.value;
+    const valorUnitario = document.getElementById('valor_unitario')?.value;
+
+    // Validação básica
+    if (!codigoFornecedor || !marca || !descricao || !quantidade || !valorUnitario) {
+        showMessage('Preencha todos os campos obrigatórios', 'error');
+        return;
+    }
+
     const formData = {
-        codigo_fornecedor: document.getElementById('codigo_fornecedor').value.trim(),
-        ncm: document.getElementById('ncm').value.trim(),
-        marca: document.getElementById('marca').value.trim(),
-        descricao: document.getElementById('descricao').value.trim(),
-        unidade: document.getElementById('unidade').value,
-        quantidade: parseInt(document.getElementById('quantidade').value),
-        valor_unitario: parseFloat(document.getElementById('valor_unitario').value)
+        codigo_fornecedor: codigoFornecedor,
+        ncm: ncm || '',
+        marca: marca,
+        descricao: descricao,
+        unidade: unidade || 'UN',
+        quantidade: parseInt(quantidade),
+        valor_unitario: parseFloat(valorUnitario)
     };
 
     try {
@@ -427,6 +459,11 @@ window.saveMovimentacao = async function(event) {
     if (!currentMovimentacao) return;
 
     const quantidade = parseInt(document.getElementById('mov_quantidade').value);
+
+    if (!quantidade || quantidade <= 0) {
+        showMessage('Informe uma quantidade válida', 'error');
+        return;
+    }
 
     try {
         const response = await fetch(`${API_URL}/estoque/${currentMovimentacao.id}/movimentar`, {
