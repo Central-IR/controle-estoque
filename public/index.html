@@ -75,10 +75,11 @@
                         <thead>
                             <tr>
                                 <th>Código</th>
-                                <th>Cód. Fornecedor</th>
+                                <th>Modelo</th>
                                 <th>NCM</th>
                                 <th>Marca</th>
                                 <th>Descrição</th>
+                                <th>Unidade</th>
                                 <th>Quantidade</th>
                                 <th>Valor Unit.</th>
                                 <th>Valor Total</th>
@@ -92,44 +93,140 @@
         </div>
     </div>
 
-    <!-- MODAL DE FORMULÁRIO -->
+    <!-- MODAL DE FORMULÁRIO COM ABAS -->
     <div class="modal-overlay" id="formModal">
         <div class="modal-content">
             <div class="modal-header">
                 <h3 class="modal-title" id="formTitle">Novo Produto</h3>
+                <button class="modal-close-btn" onclick="closeFormModal(true)">✕</button>
+            </div>
+            
+            <!-- Abas -->
+            <div class="tabs">
+                <button class="tab-button active" onclick="switchTab('fornecedor')">Fornecedor</button>
+                <button class="tab-button" onclick="switchTab('produto')">Produto</button>
             </div>
             
             <form id="productForm" onsubmit="saveProduct(event)">
-                <div class="form-grid">
-                    <div class="form-group">
-                        <label for="codigo_fornecedor">Código Fornecedor *</label>
-                        <input type="text" id="codigo_fornecedor" required>
+                <!-- Aba Fornecedor -->
+                <div id="tab-fornecedor" class="tab-content active">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="codigo_fornecedor">Modelo *</label>
+                            <input type="text" id="codigo_fornecedor" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="ncm">NCM</label>
+                            <input type="text" id="ncm">
+                        </div>
+                        <div class="form-group">
+                            <label for="marca">Marca *</label>
+                            <input type="text" id="marca" required>
+                        </div>
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                            <label for="descricao">Descrição *</label>
+                            <textarea id="descricao" rows="2" required></textarea>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label for="ncm">NCM</label>
-                        <input type="text" id="ncm">
-                    </div>
-                    <div class="form-group">
-                        <label for="marca">Marca *</label>
-                        <input type="text" id="marca" required>
-                    </div>
-                    <div class="form-group" style="grid-column: 1 / -1;">
-                        <label for="descricao">Descrição *</label>
-                        <textarea id="descricao" rows="3" required></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label for="quantidade">Quantidade *</label>
-                        <input type="number" id="quantidade" min="0" step="1" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="valor_unitario">Valor Unitário (R$) *</label>
-                        <input type="number" id="valor_unitario" min="0" step="0.01" required>
+                </div>
+
+                <!-- Aba Produto -->
+                <div id="tab-produto" class="tab-content">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="unidade">Unidade *</label>
+                            <select id="unidade" required>
+                                <option value="UN">UN</option>
+                                <option value="CX">CX</option>
+                                <option value="PCT">PCT</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="quantidade">Quantidade *</label>
+                            <input type="number" id="quantidade" min="0" step="1" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="valor_unitario">Valor Unitário (R$) *</label>
+                            <input type="number" id="valor_unitario" min="0" step="0.01" required>
+                        </div>
                     </div>
                 </div>
 
                 <div class="modal-actions">
-                    <button type="button" onclick="closeFormModal()" class="secondary">Cancelar</button>
+                    <button type="button" onclick="closeFormModal(true)" class="secondary">Cancelar</button>
                     <button type="submit" class="success">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL DE VISUALIZAÇÃO -->
+    <div class="modal-overlay" id="viewModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Detalhes do Produto</h3>
+                <button class="modal-close-btn" onclick="closeViewModal()">✕</button>
+            </div>
+            
+            <div class="view-details" id="viewDetails"></div>
+
+            <div class="modal-actions">
+                <button type="button" onclick="closeViewModal()" class="secondary">Fechar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE ENTRADA -->
+    <div class="modal-overlay" id="entradaModal">
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <h3 class="modal-title">Entrada de Estoque</h3>
+                <button class="modal-close-btn" onclick="closeEntradaModal()">✕</button>
+            </div>
+            
+            <form id="entradaForm" onsubmit="processarEntrada(event)">
+                <div class="form-group">
+                    <label>Produto: <strong id="entradaProduto"></strong></label>
+                </div>
+                <div class="form-group">
+                    <label>Quantidade Atual: <strong id="entradaQuantidadeAtual"></strong></label>
+                </div>
+                <div class="form-group">
+                    <label for="entradaQuantidade">Quantidade a Adicionar *</label>
+                    <input type="number" id="entradaQuantidade" min="1" step="1" required>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" onclick="closeEntradaModal()" class="secondary">Cancelar</button>
+                    <button type="submit" class="success">Confirmar Entrada</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL DE SAÍDA -->
+    <div class="modal-overlay" id="saidaModal">
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <h3 class="modal-title">Saída de Estoque</h3>
+                <button class="modal-close-btn" onclick="closeSaidaModal()">✕</button>
+            </div>
+            
+            <form id="saidaForm" onsubmit="processarSaida(event)">
+                <div class="form-group">
+                    <label>Produto: <strong id="saidaProduto"></strong></label>
+                </div>
+                <div class="form-group">
+                    <label>Quantidade Atual: <strong id="saidaQuantidadeAtual"></strong></label>
+                </div>
+                <div class="form-group">
+                    <label for="saidaQuantidade">Quantidade a Remover *</label>
+                    <input type="number" id="saidaQuantidade" min="1" step="1" required>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" onclick="closeSaidaModal()" class="secondary">Cancelar</button>
+                    <button type="submit" class="danger">Confirmar Saída</button>
                 </div>
             </form>
         </div>
