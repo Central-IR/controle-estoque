@@ -18,6 +18,14 @@ let currentProductForMovement = null;
 console.log('🚀 Estoque iniciado');
 console.log('📍 API URL:', API_URL);
 
+// Função para formatar valores monetários no padrão brasileiro
+function formatarMoeda(valor) {
+    return parseFloat(valor).toLocaleString('pt-BR', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     verificarAutenticacao();
 });
@@ -273,8 +281,8 @@ function renderTable(products) {
             <td>${p.descricao}</td>
             <td>${p.unidade || 'UN'}</td>
             <td><strong>${p.quantidade}</strong></td>
-            <td>R$ ${parseFloat(p.valor_unitario).toFixed(2)}</td>
-            <td><strong>R$ ${(p.quantidade * parseFloat(p.valor_unitario)).toFixed(2)}</strong></td>
+            <td>R$ ${formatarMoeda(p.valor_unitario)}</td>
+            <td><strong>R$ ${formatarMoeda(p.quantidade * parseFloat(p.valor_unitario))}</strong></td>
             <td class="actions-cell">
                 <button onclick="viewProduct('${p.id}')" class="action-btn view">Ver</button>
                 <button onclick="editProduct('${p.id}')" class="action-btn edit">Editar</button>
@@ -298,6 +306,10 @@ window.toggleForm = function() {
 window.closeFormModal = function() {
     document.getElementById('formModal').classList.remove('show');
     editingProductId = null;
+};
+
+window.cancelFormModal = function() {
+    closeFormModal();
     showMessage('Cadastro cancelado', 'error');
 };
 
@@ -320,8 +332,8 @@ window.viewProduct = function(id) {
     document.getElementById('view-descricao').textContent = produto.descricao;
     document.getElementById('view-unidade').textContent = produto.unidade || 'UN';
     document.getElementById('view-quantidade').textContent = produto.quantidade;
-    document.getElementById('view-valor-unitario').textContent = `R$ ${parseFloat(produto.valor_unitario).toFixed(2)}`;
-    document.getElementById('view-valor-total').textContent = `R$ ${(produto.quantidade * parseFloat(produto.valor_unitario)).toFixed(2)}`;
+    document.getElementById('view-valor-unitario').textContent = `R$ ${formatarMoeda(produto.valor_unitario)}`;
+    document.getElementById('view-valor-total').textContent = `R$ ${formatarMoeda(produto.quantidade * parseFloat(produto.valor_unitario))}`;
     
     document.getElementById('viewModal').classList.add('show');
 };
@@ -342,7 +354,7 @@ window.editProduct = async function(id) {
     document.getElementById('descricao').value = produto.descricao;
     document.getElementById('unidade').value = produto.unidade || 'UN';
     document.getElementById('quantidade').value = produto.quantidade;
-    document.getElementById('valor_unitario').value = parseFloat(produto.valor_unitario).toFixed(2);
+    document.getElementById('valor_unitario').value = formatarMoeda(produto.valor_unitario);
     
     switchTab('fornecedor');
     document.getElementById('formModal').classList.add('show');
@@ -351,6 +363,9 @@ window.editProduct = async function(id) {
 window.saveProduct = async function(event) {
     event.preventDefault();
 
+    const valorUnitarioInput = document.getElementById('valor_unitario').value.trim();
+    const valorUnitario = parseFloat(valorUnitarioInput.replace(/\./g, '').replace(',', '.'));
+
     const formData = {
         codigo_fornecedor: document.getElementById('codigo_fornecedor').value.trim(),
         ncm: document.getElementById('ncm').value.trim(),
@@ -358,7 +373,7 @@ window.saveProduct = async function(event) {
         descricao: document.getElementById('descricao').value.trim(),
         unidade: document.getElementById('unidade').value,
         quantidade: parseInt(document.getElementById('quantidade').value),
-        valor_unitario: parseFloat(document.getElementById('valor_unitario').value)
+        valor_unitario: valorUnitario
     };
 
     try {
@@ -414,6 +429,10 @@ window.closeEntradaModal = function() {
     currentProductForMovement = null;
 };
 
+window.cancelEntradaModal = function() {
+    closeEntradaModal();
+};
+
 window.saveEntrada = async function(event) {
     event.preventDefault();
     
@@ -460,6 +479,10 @@ window.openSaidaModal = function(id) {
 window.closeSaidaModal = function() {
     document.getElementById('saidaModal').classList.remove('show');
     currentProductForMovement = null;
+};
+
+window.cancelSaidaModal = function() {
+    closeSaidaModal();
 };
 
 window.saveSaida = async function(event) {
@@ -559,8 +582,8 @@ function generateEstoquePDF() {
             p.descricao,
             p.unidade || 'UN',
             p.quantidade.toString(),
-            `R$ ${parseFloat(p.valor_unitario).toFixed(2)}`,
-            `R$ ${(p.quantidade * parseFloat(p.valor_unitario)).toFixed(2)}`
+            `R$ ${formatarMoeda(p.valor_unitario)}`,
+            `R$ ${formatarMoeda(p.quantidade * parseFloat(p.valor_unitario))}`
         ]);
 
         doc.autoTable({
@@ -626,8 +649,8 @@ function generateEstoquePDF() {
                 p.descricao,
                 p.unidade || 'UN',
                 p.quantidade.toString(),
-                `R$ ${parseFloat(p.valor_unitario).toFixed(2)}`,
-                `R$ ${(p.quantidade * parseFloat(p.valor_unitario)).toFixed(2)}`
+                `R$ ${formatarMoeda(p.valor_unitario)}`,
+                `R$ ${formatarMoeda(p.quantidade * parseFloat(p.valor_unitario))}`
             ]);
 
             doc.autoTable({
@@ -683,7 +706,7 @@ function generateEstoquePDF() {
     doc.setFont(undefined, 'normal');
     doc.text(`Total de Produtos: ${produtosFiltrados.length}`, 14, finalY + 18);
     doc.text(`Quantidade Total: ${quantidadeTotalGeral}`, 14, finalY + 24);
-    doc.text(`Valor Total em Estoque: R$ ${valorTotalGeral.toFixed(2)}`, 14, finalY + 30);
+    doc.text(`Valor Total em Estoque: R$ ${formatarMoeda(valorTotalGeral)}`, 14, finalY + 30);
 
     doc.save(`Estoque_${marcaSelecionada}_${new Date().toISOString().split('T')[0]}.pdf`);
     showMessage('Relatório PDF gerado com sucesso!', 'success');
