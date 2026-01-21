@@ -233,7 +233,7 @@ function renderTable(products) {
     if (!tbody) return;
 
     if (products.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 2rem;">Nenhum produto encontrado</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 2rem;">Nenhum produto encontrado</td></tr>';
         return;
     }
 
@@ -244,30 +244,60 @@ function renderTable(products) {
             <td>${p.ncm || '-'}</td>
             <td>${p.marca}</td>
             <td>${p.descricao}</td>
+            <td>${p.unidade || 'UN'}</td>
             <td><strong>${p.quantidade}</strong></td>
             <td>R$ ${parseFloat(p.valor_unitario).toFixed(2)}</td>
             <td><strong>R$ ${(p.quantidade * parseFloat(p.valor_unitario)).toFixed(2)}</strong></td>
             <td class="actions-cell">
+                <button onclick="viewProduct('${p.id}')" class="action-btn view">Ver</button>
                 <button onclick="editProduct('${p.id}')" class="action-btn edit">Editar</button>
-                <button onclick="deleteProduct('${p.id}')" class="action-btn delete">Excluir</button>
+                <button onclick="openEntradaModal('${p.id}')" class="action-btn success">Entrada</button>
+                <button onclick="openSaidaModal('${p.id}')" class="action-btn delete">Saída</button>
             </td>
         </tr>
     `).join('');
 }
 
-// MODAL E FORMULÁRIO
+// MODAL DE ABAS
 let editingProductId = null;
+let formCancelado = false;
+
+window.switchTab = function(tabName) {
+    // Remover active de todos os botões e conteúdos
+    document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+    
+    // Adicionar active ao selecionado
+    document.querySelector(`[onclick="switchTab('${tabName}')"]`).classList.add('active');
+    document.getElementById(`tab-${tabName}`).classList.add('active');
+};
 
 window.toggleForm = function() {
     editingProductId = null;
+    formCancelado = false;
     document.getElementById('formTitle').textContent = 'Novo Produto';
     document.getElementById('productForm').reset();
+    
+    // Reset abas para a primeira
+    switchTab('fornecedor');
+    
     document.getElementById('formModal').classList.add('show');
 };
 
-window.closeFormModal = function() {
-    document.getElementById('formModal').classList.remove('show');
+window.closeFormModal = function(cancelado = false) {
+    const modal = document.getElementById('formModal');
+    modal.classList.remove('show');
+    
+    if (cancelado) {
+        if (editingProductId) {
+            showMessage('Atualização cancelada', 'error');
+        } else {
+            showMessage('Cadastro cancelado', 'error');
+        }
+    }
+    
     editingProductId = null;
+    formCancelado = false;
 };
 
 window.editProduct = async function(id) {
@@ -275,13 +305,18 @@ window.editProduct = async function(id) {
     if (!produto) return;
 
     editingProductId = id;
+    formCancelado = false;
     document.getElementById('formTitle').textContent = 'Editar Produto';
     document.getElementById('codigo_fornecedor').value = produto.codigo_fornecedor;
     document.getElementById('ncm').value = produto.ncm || '';
     document.getElementById('marca').value = produto.marca;
     document.getElementById('descricao').value = produto.descricao;
+    document.getElementById('unidade').value = produto.unidade || 'UN';
     document.getElementById('quantidade').value = produto.quantidade;
     document.getElementById('valor_unitario').value = parseFloat(produto.valor_unitario).toFixed(2);
+    
+    // Reset abas para a primeira
+    switchTab('fornecedor');
     
     document.getElementById('formModal').classList.add('show');
 };
@@ -294,6 +329,7 @@ window.saveProduct = async function(event) {
         ncm: document.getElementById('ncm').value.trim(),
         marca: document.getElementById('marca').value.trim(),
         descricao: document.getElementById('descricao').value.trim(),
+        unidade: document.getElementById('unidade').value,
         quantidade: parseInt(document.getElementById('quantidade').value),
         valor_unitario: parseFloat(document.getElementById('valor_unitario').value)
     };
@@ -319,34 +355,185 @@ window.saveProduct = async function(event) {
             throw new Error(error.error || 'Erro ao salvar');
         }
 
+        const savedProduct = await response.json();
+        
         await loadProducts();
-        closeFormModal();
-        showMessage(editingProductId ? 'Produto atualizado' : 'Produto criado', 'success');
+        closeFormModal(false);
+        
+        if (editingProductId) {
+            showMessage(`${savedProduct.codigo} atualizado`, 'success');
+        } else {
+            showMessage(`${savedProduct.codigo} registrado`, 'success');
+            showMessage(`Entrada de ${formData.quantidade} para o item ${savedProduct.codigo}`, 'success');
+        }
     } catch (error) {
         showMessage(error.message, 'error');
     }
 };
 
-window.deleteProduct = async function(id) {
+// MODAL DE VISUALIZAÇÃO
+window.viewProduct = function(id) {
     const produto = produtos.find(p => p.id === id);
     if (!produto) return;
 
-    if (!confirm(`Excluir produto ${produto.codigo_fornecedor}?`)) return;
+    const detailsHtml = `
+        <div class="view-detail-item">
+            <div class="view-detail-label">Código</div>
+            <div class="view-detail-value">${produto.codigo}</div>
+        </div>
+        <div class="view-detail-item">
+            <div class="view-detail-label">Modelo (Cód. Fornecedor)</div>
+            <div class="view-detail-value">${produto.codigo_fornecedor}</div>
+        </div>
+        <div class="view-detail-item">
+            <div class="view-detail-label">NCM</div>
+            <div class="view-detail-value">${produto.ncm || '-'}</div>
+        </div>
+        <div class="view-detail-item">
+            <div class="view-detail-label">Marca</div>
+            <div class="view-detail-value">${produto.marca}</div>
+        </div>
+        <div class="view-detail-item" style="grid-column: 1 / -1;">
+            <div class="view-detail-label">Descrição</div>
+            <div class="view-detail-value">${produto.descricao}</div>
+        </div>
+        <div class="view-detail-item">
+            <div class="view-detail-label">Unidade</div>
+            <div class="view-detail-value">${produto.unidade || 'UN'}</div>
+        </div>
+        <div class="view-detail-item">
+            <div class="view-detail-label">Quantidade</div>
+            <div class="view-detail-value">${produto.quantidade}</div>
+        </div>
+        <div class="view-detail-item">
+            <div class="view-detail-label">Valor Unitário</div>
+            <div class="view-detail-value">R$ ${parseFloat(produto.valor_unitario).toFixed(2)}</div>
+        </div>
+        <div class="view-detail-item">
+            <div class="view-detail-label">Valor Total</div>
+            <div class="view-detail-value">R$ ${(produto.quantidade * parseFloat(produto.valor_unitario)).toFixed(2)}</div>
+        </div>
+    `;
+
+    document.getElementById('viewDetails').innerHTML = detailsHtml;
+    document.getElementById('viewModal').classList.add('show');
+};
+
+window.closeViewModal = function() {
+    document.getElementById('viewModal').classList.remove('show');
+};
+
+// MODAL DE ENTRADA
+let entradaProductId = null;
+
+window.openEntradaModal = function(id) {
+    const produto = produtos.find(p => p.id === id);
+    if (!produto) return;
+
+    entradaProductId = id;
+    document.getElementById('entradaProduto').textContent = `${produto.codigo} - ${produto.codigo_fornecedor}`;
+    document.getElementById('entradaQuantidadeAtual').textContent = produto.quantidade;
+    document.getElementById('entradaQuantidade').value = '';
+    document.getElementById('entradaModal').classList.add('show');
+};
+
+window.closeEntradaModal = function() {
+    document.getElementById('entradaModal').classList.remove('show');
+    entradaProductId = null;
+};
+
+window.processarEntrada = async function(event) {
+    event.preventDefault();
+    
+    const quantidade = parseInt(document.getElementById('entradaQuantidade').value);
+    
+    if (quantidade <= 0) {
+        showMessage('Quantidade inválida', 'error');
+        return;
+    }
 
     try {
-        const response = await fetch(`${API_URL}/estoque/${id}`, {
-            method: 'DELETE',
+        const response = await fetch(`${API_URL}/estoque/${entradaProductId}/movimentar`, {
+            method: 'POST',
             headers: {
+                'Content-Type': 'application/json',
                 'X-Session-Token': sessionToken
-            }
+            },
+            body: JSON.stringify({
+                tipo: 'entrada',
+                quantidade: quantidade
+            })
         });
 
-        if (!response.ok) throw new Error('Erro ao excluir');
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Erro ao processar entrada');
+        }
 
+        const produto = await response.json();
+        
         await loadProducts();
-        showMessage('Produto excluído', 'success');
+        closeEntradaModal();
+        showMessage(`Entrada de ${quantidade} para o item ${produto.codigo}`, 'success');
     } catch (error) {
-        showMessage('Erro ao excluir produto', 'error');
+        showMessage(error.message, 'error');
+    }
+};
+
+// MODAL DE SAÍDA
+let saidaProductId = null;
+
+window.openSaidaModal = function(id) {
+    const produto = produtos.find(p => p.id === id);
+    if (!produto) return;
+
+    saidaProductId = id;
+    document.getElementById('saidaProduto').textContent = `${produto.codigo} - ${produto.codigo_fornecedor}`;
+    document.getElementById('saidaQuantidadeAtual').textContent = produto.quantidade;
+    document.getElementById('saidaQuantidade').value = '';
+    document.getElementById('saidaModal').classList.add('show');
+};
+
+window.closeSaidaModal = function() {
+    document.getElementById('saidaModal').classList.remove('show');
+    saidaProductId = null;
+};
+
+window.processarSaida = async function(event) {
+    event.preventDefault();
+    
+    const quantidade = parseInt(document.getElementById('saidaQuantidade').value);
+    
+    if (quantidade <= 0) {
+        showMessage('Quantidade inválida', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_URL}/estoque/${saidaProductId}/movimentar`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Session-Token': sessionToken
+            },
+            body: JSON.stringify({
+                tipo: 'saida',
+                quantidade: quantidade
+            })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Erro ao processar saída');
+        }
+
+        const produto = await response.json();
+        
+        await loadProducts();
+        closeSaidaModal();
+        showMessage(`Saída de ${quantidade} para o item ${produto.codigo}`, 'error');
+    } catch (error) {
+        showMessage(error.message, 'error');
     }
 };
 
@@ -410,6 +597,7 @@ window.generateInventoryPDF = function() {
             p.codigo_fornecedor,
             p.ncm || '-',
             p.descricao,
+            p.unidade || 'UN',
             p.quantidade.toString(),
             `R$ ${parseFloat(p.valor_unitario).toFixed(2)}`,
             `R$ ${(p.quantidade * parseFloat(p.valor_unitario)).toFixed(2)}`
@@ -418,7 +606,7 @@ window.generateInventoryPDF = function() {
         // Adicionar tabela
         doc.autoTable({
             startY: startY,
-            head: [['Código', 'Cód. Fornec.', 'NCM', 'Descrição', 'Qtd', 'Valor Un.', 'Valor Total']],
+            head: [['Código', 'Modelo', 'NCM', 'Descrição', 'Un.', 'Qtd', 'Valor Un.', 'Valor Total']],
             body: tableData,
             theme: 'grid',
             headStyles: {
@@ -436,12 +624,13 @@ window.generateInventoryPDF = function() {
             },
             columnStyles: {
                 0: { cellWidth: 20 },
-                1: { cellWidth: 30 },
-                2: { cellWidth: 25 },
-                3: { cellWidth: 100 },
-                4: { cellWidth: 20, halign: 'center' },
-                5: { cellWidth: 25, halign: 'right' },
-                6: { cellWidth: 30, halign: 'right' }
+                1: { cellWidth: 25 },
+                2: { cellWidth: 20 },
+                3: { cellWidth: 90 },
+                4: { cellWidth: 15, halign: 'center' },
+                5: { cellWidth: 18, halign: 'center' },
+                6: { cellWidth: 25, halign: 'right' },
+                7: { cellWidth: 30, halign: 'right' }
             },
             margin: { left: 14, right: 14 }
         });
