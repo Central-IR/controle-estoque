@@ -272,8 +272,12 @@ function renderTable(products) {
         return;
     }
 
-    tbody.innerHTML = products.map(p => `
-        <tr>
+    tbody.innerHTML = '';
+    
+    products.forEach(p => {
+        const tr = document.createElement('tr');
+        
+        tr.innerHTML = `
             <td><strong>${p.codigo}</strong></td>
             <td>${p.codigo_fornecedor}</td>
             <td>${p.ncm || '-'}</td>
@@ -283,14 +287,46 @@ function renderTable(products) {
             <td><strong>${p.quantidade}</strong></td>
             <td>R$ ${formatarMoeda(p.valor_unitario)}</td>
             <td><strong>R$ ${formatarMoeda(p.quantidade * parseFloat(p.valor_unitario))}</strong></td>
-            <td class="actions-cell">
-                <button onclick="viewProduct('${p.id}')" class="action-btn view">Ver</button>
-                <button onclick="editProduct('${p.id}')" class="action-btn edit">Editar</button>
-                <button onclick="openEntradaModal('${p.id}')" class="action-btn success">Entrada</button>
-                <button onclick="openSaidaModal('${p.id}')" class="action-btn danger">Saída</button>
-            </td>
-        </tr>
-    `).join('');
+            <td class="actions-cell"></td>
+        `;
+        
+        const actionsCell = tr.querySelector('.actions-cell');
+        
+        const btnVer = document.createElement('button');
+        btnVer.className = 'action-btn view';
+        btnVer.textContent = 'Ver';
+        btnVer.addEventListener('click', function() { 
+            viewProduct(p.id); 
+        });
+        
+        const btnEditar = document.createElement('button');
+        btnEditar.className = 'action-btn edit';
+        btnEditar.textContent = 'Editar';
+        btnEditar.addEventListener('click', function() { 
+            editProduct(p.id); 
+        });
+        
+        const btnEntrada = document.createElement('button');
+        btnEntrada.className = 'action-btn success';
+        btnEntrada.textContent = 'Entrada';
+        btnEntrada.addEventListener('click', function() { 
+            openEntradaModal(p.id); 
+        });
+        
+        const btnSaida = document.createElement('button');
+        btnSaida.className = 'action-btn danger';
+        btnSaida.textContent = 'Saída';
+        btnSaida.addEventListener('click', function() { 
+            openSaidaModal(p.id); 
+        });
+        
+        actionsCell.appendChild(btnVer);
+        actionsCell.appendChild(btnEditar);
+        actionsCell.appendChild(btnEntrada);
+        actionsCell.appendChild(btnSaida);
+        
+        tbody.appendChild(tr);
+    });
 }
 
 // MODAL E FORMULÁRIO
@@ -342,7 +378,7 @@ window.closeViewModal = function() {
     document.getElementById('viewModal').classList.remove('show');
 };
 
-window.editProduct = async function(id) {
+window.editProduct = function(id) {
     const produto = produtos.find(p => p.id === id);
     if (!produto) return;
 
@@ -376,12 +412,15 @@ window.saveProduct = async function(event) {
         valor_unitario: valorUnitario
     };
 
+    const isEditing = editingProductId !== null;
+    const produtoId = editingProductId;
+
     try {
-        const url = editingProductId 
-            ? `${API_URL}/estoque/${editingProductId}`
+        const url = isEditing 
+            ? `${API_URL}/estoque/${produtoId}`
             : `${API_URL}/estoque`;
         
-        const method = editingProductId ? 'PUT' : 'POST';
+        const method = isEditing ? 'PUT' : 'POST';
 
         const response = await fetch(url, {
             method,
@@ -403,10 +442,10 @@ window.saveProduct = async function(event) {
         await loadMovements();
         closeFormModal();
         
-        if (!editingProductId) {
-            showMessage(`Entrada de ${formData.quantidade} para o item ${result.codigo}`, 'success');
+        if (isEditing) {
+            showMessage('Produto atualizado com sucesso', 'success');
         } else {
-            showMessage('Produto atualizado', 'success');
+            showMessage(`Entrada de ${formData.quantidade} para o item ${result.codigo}`, 'success');
         }
     } catch (error) {
         showMessage(error.message, 'error');
