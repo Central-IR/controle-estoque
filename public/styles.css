@@ -673,6 +673,22 @@ button.small {
     padding: 1rem 0;
 }
 
+.view-content-simple {
+    padding: 1rem 0;
+}
+
+.view-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.view-row:last-child {
+    border-bottom: none;
+}
+
 .view-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -701,10 +717,6 @@ button.small {
     font-size: 1rem;
     font-weight: 500;
     color: var(--text-primary);
-    padding: 0.75rem;
-    background: var(--input-bg);
-    border-radius: 6px;
-    border: 1px solid var(--border-color);
 }
 
 /* PDF OPTIONS */
