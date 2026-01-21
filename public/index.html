@@ -48,7 +48,7 @@
                     <input type="text" id="search" placeholder="Buscar por código, marca ou descrição..." oninput="filterProducts()">
                     
                     <!-- Botão PDF ao lado do Sincronizar -->
-                    <button class="sync-btn" onclick="generateInventoryPDF()" title="Gerar Relatório PDF">
+                    <button class="sync-btn" onclick="openPdfModal()" title="Gerar Relatório PDF">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
                             <polyline points="14 2 14 8 20 8"></polyline>
@@ -75,10 +75,11 @@
                         <thead>
                             <tr>
                                 <th>Código</th>
-                                <th>Cód. Fornecedor</th>
+                                <th>Modelo</th>
                                 <th>NCM</th>
                                 <th>Marca</th>
                                 <th>Descrição</th>
+                                <th>Unidade</th>
                                 <th>Quantidade</th>
                                 <th>Valor Unit.</th>
                                 <th>Valor Total</th>
@@ -92,38 +93,61 @@
         </div>
     </div>
 
-    <!-- MODAL DE FORMULÁRIO -->
+    <!-- MODAL DE FORMULÁRIO COM ABAS -->
     <div class="modal-overlay" id="formModal">
         <div class="modal-content">
             <div class="modal-header">
                 <h3 class="modal-title" id="formTitle">Novo Produto</h3>
+                <button onclick="closeFormModal()" class="close-modal-btn">✕</button>
             </div>
             
+            <div class="tabs">
+                <button class="tab-button active" onclick="switchTab('fornecedor')">Fornecedor</button>
+                <button class="tab-button" onclick="switchTab('produto')">Produto</button>
+            </div>
+
             <form id="productForm" onsubmit="saveProduct(event)">
-                <div class="form-grid">
-                    <div class="form-group">
-                        <label for="codigo_fornecedor">Código Fornecedor *</label>
-                        <input type="text" id="codigo_fornecedor" required>
+                <!-- Aba Fornecedor -->
+                <div id="tab-fornecedor" class="tab-content active">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="codigo_fornecedor">Modelo *</label>
+                            <input type="text" id="codigo_fornecedor" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="ncm">NCM</label>
+                            <input type="text" id="ncm">
+                        </div>
+                        <div class="form-group">
+                            <label for="marca">Marca *</label>
+                            <input type="text" id="marca" required>
+                        </div>
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                            <label for="descricao">Descrição *</label>
+                            <textarea id="descricao" rows="3" required></textarea>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label for="ncm">NCM</label>
-                        <input type="text" id="ncm">
-                    </div>
-                    <div class="form-group">
-                        <label for="marca">Marca *</label>
-                        <input type="text" id="marca" required>
-                    </div>
-                    <div class="form-group" style="grid-column: 1 / -1;">
-                        <label for="descricao">Descrição *</label>
-                        <textarea id="descricao" rows="3" required></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label for="quantidade">Quantidade *</label>
-                        <input type="number" id="quantidade" min="0" step="1" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="valor_unitario">Valor Unitário (R$) *</label>
-                        <input type="number" id="valor_unitario" min="0" step="0.01" required>
+                </div>
+
+                <!-- Aba Produto -->
+                <div id="tab-produto" class="tab-content">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="unidade">Unidade *</label>
+                            <select id="unidade" required>
+                                <option value="UN">UN</option>
+                                <option value="CX">CX</option>
+                                <option value="PCT">PCT</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="quantidade">Quantidade *</label>
+                            <input type="number" id="quantidade" min="0" step="1" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="valor_unitario">Valor Unitário (R$) *</label>
+                            <input type="number" id="valor_unitario" min="0" step="0.01" required>
+                        </div>
                     </div>
                 </div>
 
@@ -132,6 +156,155 @@
                     <button type="submit" class="success">Salvar</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- MODAL DE VISUALIZAÇÃO -->
+    <div class="modal-overlay" id="viewModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Detalhes do Produto</h3>
+                <button onclick="closeViewModal()" class="close-modal-btn">✕</button>
+            </div>
+            
+            <div class="view-content">
+                <div class="view-grid">
+                    <div class="view-item">
+                        <span class="view-label">Código:</span>
+                        <span class="view-value" id="view-codigo"></span>
+                    </div>
+                    <div class="view-item">
+                        <span class="view-label">Modelo:</span>
+                        <span class="view-value" id="view-modelo"></span>
+                    </div>
+                    <div class="view-item">
+                        <span class="view-label">NCM:</span>
+                        <span class="view-value" id="view-ncm"></span>
+                    </div>
+                    <div class="view-item">
+                        <span class="view-label">Marca:</span>
+                        <span class="view-value" id="view-marca"></span>
+                    </div>
+                    <div class="view-item full-width">
+                        <span class="view-label">Descrição:</span>
+                        <span class="view-value" id="view-descricao"></span>
+                    </div>
+                    <div class="view-item">
+                        <span class="view-label">Unidade:</span>
+                        <span class="view-value" id="view-unidade"></span>
+                    </div>
+                    <div class="view-item">
+                        <span class="view-label">Quantidade:</span>
+                        <span class="view-value" id="view-quantidade"></span>
+                    </div>
+                    <div class="view-item">
+                        <span class="view-label">Valor Unitário:</span>
+                        <span class="view-value" id="view-valor-unitario"></span>
+                    </div>
+                    <div class="view-item">
+                        <span class="view-label">Valor Total:</span>
+                        <span class="view-value" id="view-valor-total"></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-actions">
+                <button type="button" onclick="closeViewModal()" class="secondary">Fechar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE ENTRADA -->
+    <div class="modal-overlay" id="entradaModal">
+        <div class="modal-content small-modal">
+            <div class="modal-header">
+                <h3 class="modal-title">Entrada de Estoque</h3>
+                <button onclick="closeEntradaModal()" class="close-modal-btn">✕</button>
+            </div>
+            
+            <form onsubmit="saveEntrada(event)">
+                <div class="form-group">
+                    <label for="entrada-produto-info">Produto:</label>
+                    <input type="text" id="entrada-produto-info" readonly style="background: var(--input-bg); cursor: not-allowed;">
+                </div>
+                <div class="form-group">
+                    <label for="entrada-quantidade">Quantidade *</label>
+                    <input type="number" id="entrada-quantidade" min="1" step="1" required>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" onclick="closeEntradaModal()" class="secondary">Cancelar</button>
+                    <button type="submit" class="success">Confirmar Entrada</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL DE SAÍDA -->
+    <div class="modal-overlay" id="saidaModal">
+        <div class="modal-content small-modal">
+            <div class="modal-header">
+                <h3 class="modal-title">Saída de Estoque</h3>
+                <button onclick="closeSaidaModal()" class="close-modal-btn">✕</button>
+            </div>
+            
+            <form onsubmit="saveSaida(event)">
+                <div class="form-group">
+                    <label for="saida-produto-info">Produto:</label>
+                    <input type="text" id="saida-produto-info" readonly style="background: var(--input-bg); cursor: not-allowed;">
+                </div>
+                <div class="form-group">
+                    <label for="saida-quantidade">Quantidade *</label>
+                    <input type="number" id="saida-quantidade" min="1" step="1" required>
+                </div>
+                <div class="form-group">
+                    <label style="color: var(--text-secondary); font-size: 0.85rem;">Quantidade disponível: <span id="saida-qtd-disponivel"></span></label>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" onclick="closeSaidaModal()" class="secondary">Cancelar</button>
+                    <button type="submit" class="danger">Confirmar Saída</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL DE SELEÇÃO DE PDF -->
+    <div class="modal-overlay" id="pdfModal">
+        <div class="modal-content small-modal">
+            <div class="modal-header">
+                <h3 class="modal-title">Gerar Relatório PDF</h3>
+                <button onclick="closePdfModal()" class="close-modal-btn">✕</button>
+            </div>
+            
+            <div class="pdf-options">
+                <button onclick="generatePDF('estoque')" class="pdf-option-btn">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M20 7h-3a2 2 0 0 1-2-2V2"></path>
+                        <path d="M9 18a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h7l4 4v10a2 2 0 0 1-2 2Z"></path>
+                        <path d="M3 7.6v12.8A1.6 1.6 0 0 0 4.6 22h9.8"></path>
+                    </svg>
+                    <span>Estoque</span>
+                </button>
+                <button onclick="generatePDF('entradas')" class="pdf-option-btn">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                        <polyline points="19 12 12 19 5 12"></polyline>
+                    </svg>
+                    <span>Entradas</span>
+                </button>
+                <button onclick="generatePDF('saidas')" class="pdf-option-btn">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="12" y1="19" x2="12" y2="5"></line>
+                        <polyline points="5 12 12 5 19 12"></polyline>
+                    </svg>
+                    <span>Saídas</span>
+                </button>
+            </div>
+
+            <div class="modal-actions">
+                <button type="button" onclick="closePdfModal()" class="secondary">Cancelar</button>
+            </div>
         </div>
     </div>
 
