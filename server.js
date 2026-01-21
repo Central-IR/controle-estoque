@@ -43,10 +43,8 @@ function registrarAcesso(req, res, next) {
     const cleanIP = clientIP.replace('::ffff:', '');
     const logEntry = `[${new Date().toISOString()}] ${cleanIP} - ${req.method} ${req.path}\n`;
 
-    // Salva no arquivo (silencioso)
     fs.appendFile(logFilePath, logEntry, () => {});
     
-    // Conta acessos (sem mostrar)
     accessCount++;
     uniqueIPs.add(cleanIP);
     
@@ -62,7 +60,7 @@ setInterval(() => {
         accessCount = 0;
         uniqueIPs.clear();
     }
-}, 3600000); // 1 hora
+}, 3600000);
 
 // AUTENTICAÇÃO
 const PORTAL_URL = process.env.PORTAL_URL || 'https://ir-comercio-portal-zcan.onrender.com';
@@ -201,7 +199,7 @@ app.get('/api/estoque/:id', async (req, res) => {
 // Criar produto
 app.post('/api/estoque', async (req, res) => {
     try {
-        const { codigo_fornecedor, ncm, marca, descricao, quantidade, valor_unitario } = req.body;
+        const { codigo_fornecedor, ncm, marca, descricao, unidade, quantidade, valor_unitario } = req.body;
 
         if (!codigo_fornecedor || !marca || !descricao || quantidade === undefined || valor_unitario === undefined) {
             return res.status(400).json({ error: 'Todos os campos obrigatórios devem ser preenchidos' });
@@ -236,6 +234,7 @@ app.post('/api/estoque', async (req, res) => {
                 ncm: ncm ? ncm.trim() : null,
                 marca: marca.trim().toUpperCase(),
                 descricao: descricao.trim().toUpperCase(),
+                unidade: unidade || 'UN',
                 quantidade: parseInt(quantidade),
                 valor_unitario: parseFloat(valor_unitario),
                 timestamp: new Date().toISOString()
@@ -255,7 +254,7 @@ app.post('/api/estoque', async (req, res) => {
 // Atualizar produto
 app.put('/api/estoque/:id', async (req, res) => {
     try {
-        const { codigo_fornecedor, ncm, descricao, valor_unitario } = req.body;
+        const { codigo_fornecedor, ncm, descricao, unidade, valor_unitario } = req.body;
 
         if (!codigo_fornecedor || !descricao || valor_unitario === undefined) {
             return res.status(400).json({ error: 'Todos os campos obrigatórios devem ser preenchidos' });
@@ -267,6 +266,7 @@ app.put('/api/estoque/:id', async (req, res) => {
                 codigo_fornecedor: codigo_fornecedor.trim(),
                 ncm: ncm ? ncm.trim() : null,
                 descricao: descricao.trim().toUpperCase(),
+                unidade: unidade || 'UN',
                 valor_unitario: parseFloat(valor_unitario),
                 timestamp: new Date().toISOString()
             })
@@ -337,7 +337,7 @@ app.post('/api/estoque/:id/movimentar', async (req, res) => {
     }
 });
 
-// Deletar produto
+// Deletar produto (mantido mas não exposto no frontend)
 app.delete('/api/estoque/:id', async (req, res) => {
     try {
         const { error } = await supabase
