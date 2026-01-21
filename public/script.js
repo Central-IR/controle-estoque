@@ -10,8 +10,6 @@ let marcasDisponiveis = new Set();
 let lastDataHash = '';
 let sessionToken = null;
 let autoSyncEnabled = true;
-let editingProductId = null;
-let currentMovimentacao = null;
 
 console.log('🚀 Estoque iniciado');
 console.log('📍 API URL:', API_URL);
@@ -210,22 +208,20 @@ function filtrarPorMarca(marca) {
 }
 
 function filterProducts() {
-    const search = document.getElementById('search');
-    if (!search) return;
+    const search = document.getElementById('search').value.toLowerCase();
     
-    const searchValue = search.value.toLowerCase();
     let filtered = produtos;
 
     if (marcaSelecionada !== 'TODAS') {
         filtered = filtered.filter(p => p.marca === marcaSelecionada);
     }
 
-    if (searchValue) {
+    if (search) {
         filtered = filtered.filter(p =>
-            p.codigo.toString().includes(searchValue) ||
-            p.codigo_fornecedor.toLowerCase().includes(searchValue) ||
-            p.marca.toLowerCase().includes(searchValue) ||
-            p.descricao.toLowerCase().includes(searchValue)
+            p.codigo.toString().includes(search) ||
+            p.codigo_fornecedor.toLowerCase().includes(search) ||
+            p.marca.toLowerCase().includes(search) ||
+            p.descricao.toLowerCase().includes(search)
         );
     }
 
@@ -237,7 +233,7 @@ function renderTable(products) {
     if (!tbody) return;
 
     if (products.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 2rem;">Nenhum produto encontrado</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 2rem;">Nenhum produto encontrado</td></tr>';
         return;
     }
 
@@ -248,65 +244,30 @@ function renderTable(products) {
             <td>${p.ncm || '-'}</td>
             <td>${p.marca}</td>
             <td>${p.descricao}</td>
-            <td><strong>${p.unidade || 'UN'}</strong></td>
             <td><strong>${p.quantidade}</strong></td>
             <td>R$ ${parseFloat(p.valor_unitario).toFixed(2)}</td>
             <td><strong>R$ ${(p.quantidade * parseFloat(p.valor_unitario)).toFixed(2)}</strong></td>
             <td class="actions-cell">
-                <button onclick="viewProduct('${p.id}')" class="action-btn view">Ver</button>
                 <button onclick="editProduct('${p.id}')" class="action-btn edit">Editar</button>
-                <button onclick="openEntradaModal('${p.id}')" class="action-btn entrada">Entrada</button>
-                <button onclick="openSaidaModal('${p.id}')" class="action-btn saida">Saída</button>
+                <button onclick="deleteProduct('${p.id}')" class="action-btn delete">Excluir</button>
             </td>
         </tr>
     `).join('');
 }
 
-// TABS
-window.switchTab = function(tabName) {
-    const clickedBtn = event.target;
-    
-    // Remover active de todos os botões e conteúdos
-    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-    document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-    
-    // Adicionar active ao botão e conteúdo selecionado
-    clickedBtn.classList.add('active');
-    document.getElementById(`tab-${tabName}`).classList.add('active');
-};
+// MODAL E FORMULÁRIO
+let editingProductId = null;
 
-// MODAL DE FORMULÁRIO
 window.toggleForm = function() {
     editingProductId = null;
     document.getElementById('formTitle').textContent = 'Novo Produto';
-    
-    // Resetar formulário
-    const form = document.getElementById('productForm');
-    if (form) form.reset();
-    
-    // Reset tabs
-    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-    document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-    
-    const firstTab = document.querySelector('.tab-btn:first-child');
-    if (firstTab) firstTab.classList.add('active');
-    
-    const fornecedorTab = document.getElementById('tab-fornecedor');
-    if (fornecedorTab) fornecedorTab.classList.add('active');
-    
+    document.getElementById('productForm').reset();
     document.getElementById('formModal').classList.add('show');
 };
 
 window.closeFormModal = function() {
-    const wasEditing = editingProductId !== null;
     document.getElementById('formModal').classList.remove('show');
     editingProductId = null;
-    
-    if (wasEditing) {
-        showMessage('Atualização cancelada', 'error');
-    } else {
-        showMessage('Cadastro cancelado', 'error');
-    }
 };
 
 window.editProduct = async function(id) {
@@ -315,25 +276,12 @@ window.editProduct = async function(id) {
 
     editingProductId = id;
     document.getElementById('formTitle').textContent = 'Editar Produto';
-    
-    // Preencher campos
     document.getElementById('codigo_fornecedor').value = produto.codigo_fornecedor;
     document.getElementById('ncm').value = produto.ncm || '';
     document.getElementById('marca').value = produto.marca;
     document.getElementById('descricao').value = produto.descricao;
-    document.getElementById('unidade').value = produto.unidade || 'UN';
     document.getElementById('quantidade').value = produto.quantidade;
     document.getElementById('valor_unitario').value = parseFloat(produto.valor_unitario).toFixed(2);
-    
-    // Reset tabs
-    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-    document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-    
-    const firstTab = document.querySelector('.tab-btn:first-child');
-    if (firstTab) firstTab.classList.add('active');
-    
-    const fornecedorTab = document.getElementById('tab-fornecedor');
-    if (fornecedorTab) fornecedorTab.classList.add('active');
     
     document.getElementById('formModal').classList.add('show');
 };
@@ -341,29 +289,13 @@ window.editProduct = async function(id) {
 window.saveProduct = async function(event) {
     event.preventDefault();
 
-    // Garantir que todos os campos estão acessíveis
-    const codigoFornecedor = document.getElementById('codigo_fornecedor')?.value.trim();
-    const ncm = document.getElementById('ncm')?.value.trim();
-    const marca = document.getElementById('marca')?.value.trim();
-    const descricao = document.getElementById('descricao')?.value.trim();
-    const unidade = document.getElementById('unidade')?.value;
-    const quantidade = document.getElementById('quantidade')?.value;
-    const valorUnitario = document.getElementById('valor_unitario')?.value;
-
-    // Validação básica
-    if (!codigoFornecedor || !marca || !descricao || !quantidade || !valorUnitario) {
-        showMessage('Preencha todos os campos obrigatórios', 'error');
-        return;
-    }
-
     const formData = {
-        codigo_fornecedor: codigoFornecedor,
-        ncm: ncm || '',
-        marca: marca,
-        descricao: descricao,
-        unidade: unidade || 'UN',
-        quantidade: parseInt(quantidade),
-        valor_unitario: parseFloat(valorUnitario)
+        codigo_fornecedor: document.getElementById('codigo_fornecedor').value.trim(),
+        ncm: document.getElementById('ncm').value.trim(),
+        marca: document.getElementById('marca').value.trim(),
+        descricao: document.getElementById('descricao').value.trim(),
+        quantidade: parseInt(document.getElementById('quantidade').value),
+        valor_unitario: parseFloat(document.getElementById('valor_unitario').value)
     };
 
     try {
@@ -387,135 +319,40 @@ window.saveProduct = async function(event) {
             throw new Error(error.error || 'Erro ao salvar');
         }
 
-        const savedProduct = await response.json();
         await loadProducts();
-        document.getElementById('formModal').classList.remove('show');
-        
-        if (editingProductId) {
-            showMessage(`${savedProduct.codigo} atualizado`, 'success');
-        } else {
-            showMessage(`Item ${savedProduct.codigo} cadastrado`, 'success');
-        }
-        
-        editingProductId = null;
+        closeFormModal();
+        showMessage(editingProductId ? 'Produto atualizado' : 'Produto criado', 'success');
     } catch (error) {
         showMessage(error.message, 'error');
     }
 };
 
-// MODAL DE VISUALIZAÇÃO
-window.viewProduct = function(id) {
+window.deleteProduct = async function(id) {
     const produto = produtos.find(p => p.id === id);
     if (!produto) return;
 
-    document.getElementById('view_codigo').textContent = produto.codigo;
-    document.getElementById('view_modelo').textContent = produto.codigo_fornecedor;
-    document.getElementById('view_ncm').textContent = produto.ncm || '-';
-    document.getElementById('view_marca').textContent = produto.marca;
-    document.getElementById('view_descricao').textContent = produto.descricao;
-    document.getElementById('view_unidade').textContent = produto.unidade || 'UN';
-    document.getElementById('view_quantidade').textContent = produto.quantidade;
-    document.getElementById('view_valor_unitario').textContent = `R$ ${parseFloat(produto.valor_unitario).toFixed(2)}`;
-    document.getElementById('view_valor_total').textContent = `R$ ${(produto.quantidade * parseFloat(produto.valor_unitario)).toFixed(2)}`;
-
-    document.getElementById('viewModal').classList.add('show');
-};
-
-window.closeViewModal = function() {
-    document.getElementById('viewModal').classList.remove('show');
-};
-
-// MODAL DE MOVIMENTAÇÃO (ENTRADA/SAÍDA)
-window.openEntradaModal = function(id) {
-    const produto = produtos.find(p => p.id === id);
-    if (!produto) return;
-
-    currentMovimentacao = { id, tipo: 'entrada', codigo: produto.codigo };
-    document.getElementById('movimentacaoTitle').textContent = `Entrada - Código ${produto.codigo}`;
-    document.getElementById('mov_quantidade').value = '';
-    document.getElementById('movimentacaoSubmitBtn').className = 'success entrada';
-    document.getElementById('movimentacaoModal').classList.add('show');
-};
-
-window.openSaidaModal = function(id) {
-    const produto = produtos.find(p => p.id === id);
-    if (!produto) return;
-
-    currentMovimentacao = { id, tipo: 'saida', codigo: produto.codigo };
-    document.getElementById('movimentacaoTitle').textContent = `Saída - Código ${produto.codigo}`;
-    document.getElementById('mov_quantidade').value = '';
-    document.getElementById('movimentacaoSubmitBtn').className = 'success saida';
-    document.getElementById('movimentacaoModal').classList.add('show');
-};
-
-window.closeMovimentacaoModal = function() {
-    document.getElementById('movimentacaoModal').classList.remove('show');
-    currentMovimentacao = null;
-};
-
-window.saveMovimentacao = async function(event) {
-    event.preventDefault();
-    
-    if (!currentMovimentacao) return;
-
-    const quantidade = parseInt(document.getElementById('mov_quantidade').value);
-
-    if (!quantidade || quantidade <= 0) {
-        showMessage('Informe uma quantidade válida', 'error');
-        return;
-    }
+    if (!confirm(`Excluir produto ${produto.codigo_fornecedor}?`)) return;
 
     try {
-        const response = await fetch(`${API_URL}/estoque/${currentMovimentacao.id}/movimentar`, {
-            method: 'POST',
+        const response = await fetch(`${API_URL}/estoque/${id}`, {
+            method: 'DELETE',
             headers: {
-                'Content-Type': 'application/json',
                 'X-Session-Token': sessionToken
-            },
-            body: JSON.stringify({
-                tipo: currentMovimentacao.tipo,
-                quantidade: quantidade
-            })
+            }
         });
 
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Erro ao movimentar');
-        }
+        if (!response.ok) throw new Error('Erro ao excluir');
 
         await loadProducts();
-        closeMovimentacaoModal();
-        
-        if (currentMovimentacao.tipo === 'entrada') {
-            showMessage(`Entrada de ${quantidade} para o item ${currentMovimentacao.codigo}`, 'success');
-        } else {
-            showMessage(`Saída de ${quantidade} para o item ${currentMovimentacao.codigo}`, 'error');
-        }
+        showMessage('Produto excluído', 'success');
     } catch (error) {
-        showMessage(error.message, 'error');
+        showMessage('Erro ao excluir produto', 'error');
     }
 };
 
-// MODAL DE PDF
-window.openPDFModal = function() {
-    document.getElementById('pdfModal').classList.add('show');
-};
-
-window.closePDFModal = function() {
-    document.getElementById('pdfModal').classList.remove('show');
-};
-
-window.generatePDF = function(tipo) {
-    closePDFModal();
-    
-    let produtosFiltrados = produtos;
-    
-    // Aplicar filtro de marca se selecionado
-    if (marcaSelecionada !== 'TODAS') {
-        produtosFiltrados = produtosFiltrados.filter(p => p.marca === marcaSelecionada);
-    }
-
-    if (produtosFiltrados.length === 0) {
+// GERAR PDF ORGANIZADO POR MARCA
+window.generateInventoryPDF = function() {
+    if (produtos.length === 0) {
         showMessage('Nenhum produto para gerar relatório', 'error');
         return;
     }
@@ -523,14 +360,10 @@ window.generatePDF = function(tipo) {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF('landscape');
 
-    // Título baseado no tipo
-    let titulo = 'RELATÓRIO DE ESTOQUE';
-    if (tipo === 'entradas') titulo = 'RELATÓRIO DE ENTRADAS';
-    if (tipo === 'saidas') titulo = 'RELATÓRIO DE SAÍDAS';
-
+    // Título
     doc.setFontSize(18);
     doc.setFont(undefined, 'bold');
-    doc.text(titulo, 148, 15, { align: 'center' });
+    doc.text('RELATÓRIO DE ESTOQUE', 148, 15, { align: 'center' });
 
     // Data e hora
     doc.setFontSize(10);
@@ -538,15 +371,9 @@ window.generatePDF = function(tipo) {
     const dataHora = new Date().toLocaleString('pt-BR');
     doc.text(`Gerado em: ${dataHora}`, 148, 22, { align: 'center' });
 
-    // Filtro aplicado
-    if (marcaSelecionada !== 'TODAS') {
-        doc.setFontSize(9);
-        doc.text(`Filtro: ${marcaSelecionada}`, 148, 27, { align: 'center' });
-    }
-
     // Organizar produtos por marca
     const produtosPorMarca = {};
-    produtosFiltrados.forEach(produto => {
+    produtos.forEach(produto => {
         if (!produtosPorMarca[produto.marca]) {
             produtosPorMarca[produto.marca] = [];
         }
@@ -556,7 +383,7 @@ window.generatePDF = function(tipo) {
     // Ordenar marcas alfabeticamente
     const marcasOrdenadas = Object.keys(produtosPorMarca).sort();
 
-    let startY = marcaSelecionada !== 'TODAS' ? 33 : 30;
+    let startY = 30;
 
     marcasOrdenadas.forEach((marca, index) => {
         // Verificar se precisa adicionar nova página
@@ -568,11 +395,11 @@ window.generatePDF = function(tipo) {
         // Nome da marca
         doc.setFontSize(14);
         doc.setFont(undefined, 'bold');
-        doc.setTextColor(204, 112, 0);
+        doc.setTextColor(204, 112, 0); // Cor laranja
         doc.text(marca, 14, startY);
         startY += 8;
 
-        // Ordenar produtos por código
+        // Ordenar produtos por código (crescente)
         const produtosOrdenados = produtosPorMarca[marca].sort((a, b) => {
             return parseInt(a.codigo) - parseInt(b.codigo);
         });
@@ -583,7 +410,6 @@ window.generatePDF = function(tipo) {
             p.codigo_fornecedor,
             p.ncm || '-',
             p.descricao,
-            p.unidade || 'UN',
             p.quantidade.toString(),
             `R$ ${parseFloat(p.valor_unitario).toFixed(2)}`,
             `R$ ${(p.quantidade * parseFloat(p.valor_unitario)).toFixed(2)}`
@@ -592,7 +418,7 @@ window.generatePDF = function(tipo) {
         // Adicionar tabela
         doc.autoTable({
             startY: startY,
-            head: [['Código', 'Modelo', 'NCM', 'Descrição', 'Un.', 'Qtd', 'Valor Un.', 'Valor Total']],
+            head: [['Código', 'Cód. Fornec.', 'NCM', 'Descrição', 'Qtd', 'Valor Un.', 'Valor Total']],
             body: tableData,
             theme: 'grid',
             headStyles: {
@@ -610,13 +436,12 @@ window.generatePDF = function(tipo) {
             },
             columnStyles: {
                 0: { cellWidth: 20 },
-                1: { cellWidth: 28 },
-                2: { cellWidth: 20 },
-                3: { cellWidth: 90 },
-                4: { cellWidth: 15, halign: 'center' },
-                5: { cellWidth: 18, halign: 'center' },
-                6: { cellWidth: 25, halign: 'right' },
-                7: { cellWidth: 30, halign: 'right' }
+                1: { cellWidth: 30 },
+                2: { cellWidth: 25 },
+                3: { cellWidth: 100 },
+                4: { cellWidth: 20, halign: 'center' },
+                5: { cellWidth: 25, halign: 'right' },
+                6: { cellWidth: 30, halign: 'right' }
             },
             margin: { left: 14, right: 14 }
         });
@@ -624,12 +449,12 @@ window.generatePDF = function(tipo) {
         startY = doc.lastAutoTable.finalY + 12;
     });
 
-    // Totais gerais
-    const valorTotalGeral = produtosFiltrados.reduce((acc, p) => {
+    // Totais gerais na última página
+    const valorTotalGeral = produtos.reduce((acc, p) => {
         return acc + (p.quantidade * parseFloat(p.valor_unitario));
     }, 0);
 
-    const quantidadeTotalGeral = produtosFiltrados.reduce((acc, p) => acc + p.quantidade, 0);
+    const quantidadeTotalGeral = produtos.reduce((acc, p) => acc + p.quantidade, 0);
 
     if (startY > 170) {
         doc.addPage();
@@ -644,15 +469,14 @@ window.generatePDF = function(tipo) {
 
     doc.setFontSize(10);
     doc.setFont(undefined, 'normal');
-    doc.text(`Total de Produtos: ${produtosFiltrados.length}`, 14, startY);
+    doc.text(`Total de Produtos: ${produtos.length}`, 14, startY);
     startY += 6;
     doc.text(`Quantidade Total: ${quantidadeTotalGeral}`, 14, startY);
     startY += 6;
     doc.text(`Valor Total em Estoque: R$ ${valorTotalGeral.toFixed(2)}`, 14, startY);
 
     // Salvar PDF
-    const nomeArquivo = `Relatorio_${tipo.charAt(0).toUpperCase() + tipo.slice(1)}_${new Date().toISOString().split('T')[0]}.pdf`;
-    doc.save(nomeArquivo);
+    doc.save(`Relatorio_Estoque_${new Date().toISOString().split('T')[0]}.pdf`);
     showMessage('Relatório PDF gerado com sucesso!', 'success');
 };
 
