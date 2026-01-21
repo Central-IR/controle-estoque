@@ -146,13 +146,13 @@
                         </div>
                         <div class="form-group">
                             <label for="valor_unitario">Valor Unitário (R$) *</label>
-                            <input type="number" id="valor_unitario" min="0" step="0.01" required>
+                            <input type="text" id="valor_unitario" required placeholder="0,00">
                         </div>
                     </div>
                 </div>
 
                 <div class="modal-actions">
-                    <button type="button" onclick="closeFormModal()" class="secondary">Cancelar</button>
+                    <button type="button" onclick="cancelFormModal()" class="secondary">Cancelar</button>
                     <button type="submit" class="success">Salvar</button>
                 </div>
             </form>
@@ -161,50 +161,48 @@
 
     <!-- MODAL DE VISUALIZAÇÃO -->
     <div class="modal-overlay" id="viewModal">
-        <div class="modal-content">
+        <div class="modal-content small-modal">
             <div class="modal-header">
                 <h3 class="modal-title">Detalhes do Produto</h3>
                 <button onclick="closeViewModal()" class="close-modal-btn">✕</button>
             </div>
             
-            <div class="view-content">
-                <div class="view-grid">
-                    <div class="view-item">
-                        <span class="view-label">Código:</span>
-                        <span class="view-value" id="view-codigo"></span>
-                    </div>
-                    <div class="view-item">
-                        <span class="view-label">Modelo:</span>
-                        <span class="view-value" id="view-modelo"></span>
-                    </div>
-                    <div class="view-item">
-                        <span class="view-label">NCM:</span>
-                        <span class="view-value" id="view-ncm"></span>
-                    </div>
-                    <div class="view-item">
-                        <span class="view-label">Marca:</span>
-                        <span class="view-value" id="view-marca"></span>
-                    </div>
-                    <div class="view-item full-width">
-                        <span class="view-label">Descrição:</span>
-                        <span class="view-value" id="view-descricao"></span>
-                    </div>
-                    <div class="view-item">
-                        <span class="view-label">Unidade:</span>
-                        <span class="view-value" id="view-unidade"></span>
-                    </div>
-                    <div class="view-item">
-                        <span class="view-label">Quantidade:</span>
-                        <span class="view-value" id="view-quantidade"></span>
-                    </div>
-                    <div class="view-item">
-                        <span class="view-label">Valor Unitário:</span>
-                        <span class="view-value" id="view-valor-unitario"></span>
-                    </div>
-                    <div class="view-item">
-                        <span class="view-label">Valor Total:</span>
-                        <span class="view-value" id="view-valor-total"></span>
-                    </div>
+            <div class="view-content-simple">
+                <div class="view-row">
+                    <span class="view-label">Código:</span>
+                    <span class="view-value" id="view-codigo"></span>
+                </div>
+                <div class="view-row">
+                    <span class="view-label">Modelo:</span>
+                    <span class="view-value" id="view-modelo"></span>
+                </div>
+                <div class="view-row">
+                    <span class="view-label">NCM:</span>
+                    <span class="view-value" id="view-ncm"></span>
+                </div>
+                <div class="view-row">
+                    <span class="view-label">Marca:</span>
+                    <span class="view-value" id="view-marca"></span>
+                </div>
+                <div class="view-row">
+                    <span class="view-label">Descrição:</span>
+                    <span class="view-value" id="view-descricao"></span>
+                </div>
+                <div class="view-row">
+                    <span class="view-label">Unidade:</span>
+                    <span class="view-value" id="view-unidade"></span>
+                </div>
+                <div class="view-row">
+                    <span class="view-label">Quantidade:</span>
+                    <span class="view-value" id="view-quantidade"></span>
+                </div>
+                <div class="view-row">
+                    <span class="view-label">Valor Unitário:</span>
+                    <span class="view-value" id="view-valor-unitario"></span>
+                </div>
+                <div class="view-row">
+                    <span class="view-label">Valor Total:</span>
+                    <span class="view-value" id="view-valor-total"></span>
                 </div>
             </div>
 
@@ -233,7 +231,7 @@
                 </div>
 
                 <div class="modal-actions">
-                    <button type="button" onclick="closeEntradaModal()" class="secondary">Cancelar</button>
+                    <button type="button" onclick="cancelEntradaModal()" class="secondary">Cancelar</button>
                     <button type="submit" class="success">Confirmar Entrada</button>
                 </div>
             </form>
@@ -262,7 +260,7 @@
                 </div>
 
                 <div class="modal-actions">
-                    <button type="button" onclick="closeSaidaModal()" class="secondary">Cancelar</button>
+                    <button type="button" onclick="cancelSaidaModal()" class="secondary">Cancelar</button>
                     <button type="submit" class="danger">Confirmar Saída</button>
                 </div>
             </form>
