@@ -198,37 +198,10 @@ app.get('/api/estoque/:id', async (req, res) => {
     }
 });
 
-// Buscar histórico de movimentos
-app.get('/api/estoque/movimentos', async (req, res) => {
-    try {
-        const { data: entradas, error: errorEntradas } = await supabase
-            .from('estoque_movimentos')
-            .select('*')
-            .eq('tipo', 'entrada')
-            .order('data', { ascending: false });
-
-        const { data: saidas, error: errorSaidas } = await supabase
-            .from('estoque_movimentos')
-            .select('*')
-            .eq('tipo', 'saida')
-            .order('data', { ascending: false });
-
-        res.json({
-            entradas: entradas || [],
-            saidas: saidas || []
-        });
-    } catch (error) {
-        res.json({
-            entradas: [],
-            saidas: []
-        });
-    }
-});
-
 // Criar produto
 app.post('/api/estoque', async (req, res) => {
     try {
-        const { codigo_fornecedor, ncm, marca, descricao, unidade, quantidade, valor_unitario } = req.body;
+        const { codigo_fornecedor, ncm, marca, descricao, quantidade, valor_unitario } = req.body;
 
         if (!codigo_fornecedor || !marca || !descricao || quantidade === undefined || valor_unitario === undefined) {
             return res.status(400).json({ error: 'Todos os campos obrigatórios devem ser preenchidos' });
@@ -263,7 +236,6 @@ app.post('/api/estoque', async (req, res) => {
                 ncm: ncm ? ncm.trim() : null,
                 marca: marca.trim().toUpperCase(),
                 descricao: descricao.trim().toUpperCase(),
-                unidade: unidade || 'UN',
                 quantidade: parseInt(quantidade),
                 valor_unitario: parseFloat(valor_unitario),
                 timestamp: new Date().toISOString()
@@ -272,21 +244,6 @@ app.post('/api/estoque', async (req, res) => {
             .single();
 
         if (error) throw error;
-
-        // Registrar entrada inicial (se tiver tabela de movimentos)
-        try {
-            await supabase
-                .from('estoque_movimentos')
-                .insert([{
-                    produto_id: data.id,
-                    tipo: 'entrada',
-                    quantidade: parseInt(quantidade),
-                    data: new Date().toISOString()
-                }]);
-        } catch (e) {
-            // Ignora se a tabela não existir
-        }
-
         res.status(201).json(data);
     } catch (error) {
         res.status(500).json({ 
@@ -298,9 +255,9 @@ app.post('/api/estoque', async (req, res) => {
 // Atualizar produto
 app.put('/api/estoque/:id', async (req, res) => {
     try {
-        const { codigo_fornecedor, ncm, marca, descricao, unidade, quantidade, valor_unitario } = req.body;
+        const { codigo_fornecedor, ncm, descricao, valor_unitario } = req.body;
 
-        if (!codigo_fornecedor || !marca || !descricao || valor_unitario === undefined) {
+        if (!codigo_fornecedor || !descricao || valor_unitario === undefined) {
             return res.status(400).json({ error: 'Todos os campos obrigatórios devem ser preenchidos' });
         }
 
@@ -309,9 +266,7 @@ app.put('/api/estoque/:id', async (req, res) => {
             .update({
                 codigo_fornecedor: codigo_fornecedor.trim(),
                 ncm: ncm ? ncm.trim() : null,
-                marca: marca.trim().toUpperCase(),
                 descricao: descricao.trim().toUpperCase(),
-                unidade: unidade || 'UN',
                 valor_unitario: parseFloat(valor_unitario),
                 timestamp: new Date().toISOString()
             })
@@ -331,13 +286,13 @@ app.put('/api/estoque/:id', async (req, res) => {
     }
 });
 
-// Entrada de estoque
-app.post('/api/estoque/:id/entrada', async (req, res) => {
+// Movimentação de estoque (entrada/saída)
+app.post('/api/estoque/:id/movimentar', async (req, res) => {
     try {
-        const { quantidade } = req.body;
+        const { tipo, quantidade } = req.body;
 
-        if (!quantidade || quantidade <= 0) {
-            return res.status(400).json({ error: 'Quantidade inválida' });
+        if (!['entrada', 'saida'].includes(tipo) || !quantidade || quantidade <= 0) {
+            return res.status(400).json({ error: 'Dados inválidos' });
         }
 
         // Buscar produto atual
@@ -352,7 +307,15 @@ app.post('/api/estoque/:id/entrada', async (req, res) => {
         }
 
         // Calcular nova quantidade
-        const novaQuantidade = produto.quantidade + parseInt(quantidade);
+        let novaQuantidade = produto.quantidade;
+        if (tipo === 'entrada') {
+            novaQuantidade += parseInt(quantidade);
+        } else {
+            if (produto.quantidade < parseInt(quantidade)) {
+                return res.status(400).json({ error: 'Quantidade insuficiente em estoque' });
+            }
+            novaQuantidade -= parseInt(quantidade);
+        }
 
         // Atualizar quantidade
         const { data, error } = await supabase
@@ -366,88 +329,10 @@ app.post('/api/estoque/:id/entrada', async (req, res) => {
             .single();
 
         if (error) throw error;
-
-        // Registrar movimento (se tiver tabela de movimentos)
-        try {
-            await supabase
-                .from('estoque_movimentos')
-                .insert([{
-                    produto_id: req.params.id,
-                    tipo: 'entrada',
-                    quantidade: parseInt(quantidade),
-                    data: new Date().toISOString()
-                }]);
-        } catch (e) {
-            // Ignora se a tabela não existir
-        }
-
         res.json(data);
     } catch (error) {
         res.status(500).json({ 
-            error: 'Erro ao registrar entrada'
-        });
-    }
-});
-
-// Saída de estoque
-app.post('/api/estoque/:id/saida', async (req, res) => {
-    try {
-        const { quantidade } = req.body;
-
-        if (!quantidade || quantidade <= 0) {
-            return res.status(400).json({ error: 'Quantidade inválida' });
-        }
-
-        // Buscar produto atual
-        const { data: produto, error: fetchError } = await supabase
-            .from('estoque')
-            .select('*')
-            .eq('id', req.params.id)
-            .single();
-
-        if (fetchError || !produto) {
-            return res.status(404).json({ error: 'Produto não encontrado' });
-        }
-
-        // Verificar quantidade disponível
-        if (produto.quantidade < parseInt(quantidade)) {
-            return res.status(400).json({ error: 'Quantidade insuficiente em estoque' });
-        }
-
-        // Calcular nova quantidade
-        const novaQuantidade = produto.quantidade - parseInt(quantidade);
-
-        // Atualizar quantidade
-        const { data, error } = await supabase
-            .from('estoque')
-            .update({
-                quantidade: novaQuantidade,
-                timestamp: new Date().toISOString()
-            })
-            .eq('id', req.params.id)
-            .select()
-            .single();
-
-        if (error) throw error;
-
-        // Registrar movimento (se tiver tabela não existir)
-        try {
-            await supabase
-                .from('estoque_movimentos')
-                .insert([{
-                    produto_id: req.params.id,
-                    tipo: 'saida',
-                    quantidade: parseInt(quantidade),
-                    data: new Date().toISOString()
-                }]);
-        } catch (e) {
-            // Ignora se a tabela não existir
-        }
-
-        res.json(data);
-    } catch (error) {
-        res.status(500).json({ 
-            error: 'Erro ao registrar saída'
+            error: 'Erro ao movimentar estoque'
         });
     }
 });
