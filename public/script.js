@@ -762,10 +762,9 @@ window.processarSaida = async function(event) {
 window.generateInventoryPDF = async function() {
     if (!state.produtos.length) { showMessage('Nenhum produto para gerar relatório', 'error'); return; }
 
-    // Se há filtro de grupo ativo, buscar TODOS os produtos de todos os grupos para o PDF
+    // Buscar todos os produtos sem filtro para inventário completo
     let todosProdutos = state.produtos;
     if (state.grupoCodigo !== null || state.searchTerm) {
-        // Buscar sem filtro para ter inventário completo
         try {
             const res = await fetchWithTimeout(`${API_URL}/estoque?page=1&limit=9999`, { method: 'GET', headers: getHeaders() });
             if (res.ok) {
@@ -776,56 +775,66 @@ window.generateInventoryPDF = async function() {
     }
 
     const { jsPDF } = window.jspdf;
-    const doc       = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-
+    const doc        = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     const pageWidth  = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
     const margin     = 14;
-    const maxWidth   = pageWidth - margin * 2;
-    const lineHeight = 5.5;
+    const tableWidth = pageWidth - margin * 2;
+    const footerMargin = 12;
 
-    // ── Utilitários ───────────────────────────────────────────────────────────
-    const fmtValor = (v) => 'R$ ' + (parseFloat(v) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    // ── Formatar valor ────────────────────────────────────────────────────────
+    const fmtValor = (v) => 'R$ ' + (parseFloat(v) || 0).toLocaleString('pt-BR', {
+        minimumFractionDigits: 2, maximumFractionDigits: 2
+    });
 
-    const footerMargin = 15; // margem inferior simples, sem rodapé de empresa
-
-    // ── Cabeçalho por página (igual ao PDF Proposta de Pregões) ───────────────
+    // ── Cabeçalho: logo + nome empresa (idêntico ao da imagem) ────────────────
     function adicionarCabecalho() {
         return new Promise((resolve) => {
-            const headerY   = 8;
-            const logoWidth = 40;
-            const logoHeight= 18;
+            const headerY    = 8;
+            const logoW      = 30;   // largura do logo IR
+            const logoH      = 22;   // altura do logo IR
+            const sepY       = headerY + logoH + 4; // linha separadora
 
             const img = new Image();
             img.onload = () => {
-                doc.addImage(img, 'PNG', margin, headerY, logoWidth, logoHeight);
+                // Logo
+                doc.addImage(img, 'PNG', margin, headerY, logoW, logoH);
 
-                const textX      = margin + logoWidth + 6;
-                const lineSpacing= 6;
-                const textY1     = headerY + 6;
-                const textY2     = textY1 + lineSpacing;
-
-                doc.setTextColor(0, 0, 0);
-                doc.setFontSize(12);
+                // Nome da empresa ao lado do logo — cor cinza como na imagem
+                const textX = margin + logoW + 7;
+                doc.setTextColor(140, 140, 140);   // cinza médio igual à imagem
+                doc.setFontSize(11);
                 doc.setFont(undefined, 'bold');
-                doc.text('I.R. COMÉRCIO E', textX, textY1);
-                doc.text('MATERIAIS ELÉTRICOS LTDA', textX, textY2);
+                doc.text('I.R COMÉRCIO E',          textX, headerY + 9);
+                doc.text('MATERIAIS ELÉTRICOS LTDA', textX, headerY + 16);
 
+                // Linha separadora horizontal abaixo do cabeçalho
+                doc.setDrawColor(200, 200, 200);
+                doc.setLineWidth(0.4);
+                doc.line(margin, sepY, pageWidth - margin, sepY);
+
+                // Reset
                 doc.setTextColor(0, 0, 0);
-                doc.setFontSize(10);
-                doc.setFont(undefined, 'normal');
                 doc.setDrawColor(0, 0, 0);
                 doc.setLineWidth(0.2);
+                doc.setFont(undefined, 'normal');
 
-                resolve(headerY + logoHeight + 8);
+                resolve(sepY + 6);
             };
             img.onerror = () => {
-                // sem logo: só linha separadora
+                // Fallback sem logo
+                doc.setTextColor(140, 140, 140);
+                doc.setFontSize(11);
+                doc.setFont(undefined, 'bold');
+                doc.text('I.R COMÉRCIO E MATERIAIS ELÉTRICOS LTDA', margin, headerY + 10);
+                doc.setDrawColor(200, 200, 200);
+                doc.setLineWidth(0.4);
+                doc.line(margin, sepY, pageWidth - margin, sepY);
+                doc.setTextColor(0, 0, 0);
                 doc.setDrawColor(0, 0, 0);
-                doc.setLineWidth(0.5);
-                doc.line(margin, headerY + logoHeight, pageWidth - margin, headerY + logoHeight);
                 doc.setLineWidth(0.2);
-                resolve(headerY + logoHeight + 8);
+                doc.setFont(undefined, 'normal');
+                resolve(sepY + 6);
             };
             img.src = 'I.R.-COMERCIO-E-MATERIAIS-ELETRICOS-PRETO.png';
         });
@@ -840,110 +849,163 @@ window.generateInventoryPDF = async function() {
         return yAtual > pageHeight - footerMargin - espaco;
     }
 
-    // ── Cabeçalho tabela por grupo ────────────────────────────────────────────
-    const tableWidth = maxWidth;
-    // Colunas: Código | Marca | Modelo | NCM | Descrição | Un | Qtd | V.Unit | V.Total
-    const colW = {
+    // ── Colunas da tabela ─────────────────────────────────────────────────────
+    // As larguras são absolutas em mm para garantir alinhamento perfeito
+    const col = {
         codigo:    tableWidth * 0.07,
-        marca:     tableWidth * 0.10,
-        modelo:    tableWidth * 0.10,
-        ncm:       tableWidth * 0.08,
-        descricao: tableWidth * 0.30,
+        marca:     tableWidth * 0.11,
+        modelo:    tableWidth * 0.11,
+        ncm:       tableWidth * 0.09,
+        descricao: tableWidth * 0.27,
         unidade:   tableWidth * 0.05,
         qtd:       tableWidth * 0.06,
         vunit:     tableWidth * 0.12,
         vtotal:    tableWidth * 0.12
     };
-    const rowH = 8;
+    // Calcular posição X absoluta de cada coluna (evita acúmulo de arredondamento)
+    const colX = {};
+    let _xAcc = margin;
+    for (const [k, w] of Object.entries(col)) { colX[k] = _xAcc; _xAcc += w; }
 
+    const rowH    = 8;   // altura padrão de linha
+    const textVOff= 5.2; // offset vertical do texto dentro da linha (baseline)
+    const fs      = 7.5; // font size da tabela
+
+    // ── Cabeçalho da tabela ───────────────────────────────────────────────────
     function desenharCabecalhoTabela(y) {
         doc.setFillColor(108, 117, 125);
-        doc.setDrawColor(150, 150, 150);
+        doc.setDrawColor(108, 117, 125);
         doc.rect(margin, y, tableWidth, rowH, 'FD');
         doc.setTextColor(255, 255, 255);
-        doc.setFontSize(7.5);
+        doc.setFontSize(fs);
         doc.setFont(undefined, 'bold');
-        let xp = margin;
-        const cols = [
-            ['CÓD.', colW.codigo], ['MARCA', colW.marca], ['MODELO', colW.modelo],
-            ['NCM', colW.ncm], ['DESCRIÇÃO', colW.descricao], ['UN', colW.unidade],
-            ['QTD', colW.qtd], ['V. UNIT.', colW.vunit], ['V. TOTAL', colW.vtotal]
+
+        const defs = [
+            ['CÓD.',      'codigo',   'center'],
+            ['MARCA',     'marca',    'left'  ],
+            ['MODELO',    'modelo',   'left'  ],
+            ['NCM',       'ncm',      'center'],
+            ['DESCRIÇÃO', 'descricao','left'  ],
+            ['UN',        'unidade',  'center'],
+            ['QTD',       'qtd',      'right' ],
+            ['V. UNIT.',  'vunit',    'right' ],
+            ['V. TOTAL',  'vtotal',   'right' ],
         ];
-        cols.forEach(([lbl, w]) => {
-            doc.line(xp, y, xp, y + rowH);
-            doc.text(lbl, xp + w / 2, y + 5.2, { align: 'center' });
-            xp += w;
+        defs.forEach(([lbl, key, align]) => {
+            const x = colX[key];
+            const w = col[key];
+            if (align === 'center') doc.text(lbl, x + w / 2, y + textVOff, { align: 'center' });
+            else if (align === 'right') doc.text(lbl, x + w - 1.5, y + textVOff, { align: 'right' });
+            else doc.text(lbl, x + 1.5, y + textVOff);
+            // linha divisória vertical
+            doc.setDrawColor(180, 180, 180);
+            doc.line(x, y, x, y + rowH);
         });
-        doc.line(xp, y, xp, y + rowH);
+        // última borda direita
+        doc.line(margin + tableWidth, y, margin + tableWidth, y + rowH);
+        // bordas horizontais superior e inferior
+        doc.setDrawColor(108, 117, 125);
+        doc.line(margin, y, margin + tableWidth, y);
+        doc.line(margin, y + rowH, margin + tableWidth, y + rowH);
+
         doc.setTextColor(0, 0, 0);
-        doc.setFontSize(7.5);
         doc.setFont(undefined, 'normal');
         return y + rowH;
     }
 
+    // ── Linha de produto ──────────────────────────────────────────────────────
     function desenharLinhaItem(p, y, rowIndex) {
-        const descLines  = doc.splitTextToSize(p.descricao || '-', colW.descricao - 3);
-        const marcaLines = doc.splitTextToSize(p.marca || '-', colW.marca - 2);
-        const modLines   = doc.splitTextToSize(p.codigo_fornecedor || '-', colW.modelo - 2);
+        const descLines  = doc.splitTextToSize(p.descricao  || '-', col.descricao - 3);
+        const marcaLines = doc.splitTextToSize(p.marca      || '-', col.marca     - 3);
+        const modLines   = doc.splitTextToSize(p.codigo_fornecedor || '-', col.modelo - 3);
         const nLines     = Math.max(descLines.length, marcaLines.length, modLines.length, 1);
-        const h          = Math.max(rowH, nLines * 3.5 + 3);
+        const lineH4text = 3.5;
+        const h          = Math.max(rowH, nLines * lineH4text + 3);
 
-        // Fundo alternado
+        // Fundo zebra
         if (rowIndex % 2 === 0) {
-            doc.setFillColor(250, 250, 250);
+            doc.setFillColor(248, 248, 248);
             doc.rect(margin, y, tableWidth, h, 'F');
         }
-        doc.setDrawColor(220, 220, 220);
-        doc.setLineWidth(0.1);
 
-        const cy = y + (h / 2) + 1.5; // centro vertical para textos de 1 linha
-        doc.setFontSize(7.5);
+        doc.setFontSize(fs);
         doc.setFont(undefined, 'normal');
-        doc.setTextColor(26, 26, 26);
+        doc.setTextColor(30, 30, 30);
 
-        let xp = margin;
-        // Código
-        doc.text(String(p.codigo || ''), xp + colW.codigo / 2, cy, { align: 'center' }); xp += colW.codigo;
-        // Marca (wrap)
-        marcaLines.forEach((l, i) => doc.text(l, xp + 1.5, y + 3.5 + i * 3.5));          xp += colW.marca;
-        // Modelo (wrap)
-        modLines.forEach((l, i) => doc.text(l, xp + 1.5, y + 3.5 + i * 3.5));             xp += colW.modelo;
-        // NCM
-        doc.text(p.ncm || '-', xp + colW.ncm / 2, cy, { align: 'center' });               xp += colW.ncm;
-        // Descrição (wrap)
-        descLines.forEach((l, i) => doc.text(l, xp + 1.5, y + 3.5 + i * 3.5));            xp += colW.descricao;
-        // Unidade
-        doc.text(p.unidade || 'UN', xp + colW.unidade / 2, cy, { align: 'center' });       xp += colW.unidade;
-        // Quantidade
-        doc.text(String(p.quantidade || 0), xp + colW.qtd - 1.5, cy, { align: 'right' });  xp += colW.qtd;
-        // V. Unitário
-        doc.text(fmtValor(p.valor_unitario), xp + colW.vunit - 1.5, cy, { align: 'right' }); xp += colW.vunit;
-        // V. Total
+        // Baseline vertical centrada para campos de 1 linha
+        const cy = y + h / 2 + lineH4text / 2;
+
+        // CÓD — centro
+        doc.text(String(p.codigo || ''), colX.codigo + col.codigo / 2, cy, { align: 'center' });
+
+        // MARCA — esquerda, wrap
+        doc.setFontSize(fs);
+        marcaLines.forEach((l, i) => {
+            const ly = y + 2.5 + i * lineH4text;
+            doc.text(l, colX.marca + 1.5, ly + lineH4text);
+        });
+
+        // MODELO — esquerda, wrap
+        modLines.forEach((l, i) => {
+            const ly = y + 2.5 + i * lineH4text;
+            doc.text(l, colX.modelo + 1.5, ly + lineH4text);
+        });
+
+        // NCM — centro
+        doc.text(p.ncm || '-', colX.ncm + col.ncm / 2, cy, { align: 'center' });
+
+        // DESCRIÇÃO — esquerda, wrap
+        descLines.forEach((l, i) => {
+            const ly = y + 2.5 + i * lineH4text;
+            doc.text(l, colX.descricao + 1.5, ly + lineH4text);
+        });
+
+        // UN — centro
+        doc.text(p.unidade || 'UN', colX.unidade + col.unidade / 2, cy, { align: 'center' });
+
+        // QTD — direita
+        doc.text(String(p.quantidade || 0), colX.qtd + col.qtd - 1.5, cy, { align: 'right' });
+
+        // V. UNIT — direita
+        doc.text(fmtValor(p.valor_unitario), colX.vunit + col.vunit - 1.5, cy, { align: 'right' });
+
+        // V. TOTAL — direita
         const vt = (p.quantidade || 0) * parseFloat(p.valor_unitario || 0);
-        doc.text(fmtValor(vt), xp + colW.vtotal - 1.5, cy, { align: 'right' });
+        doc.text(fmtValor(vt), colX.vtotal + col.vtotal - 1.5, cy, { align: 'right' });
 
-        // Borda inferior
+        // Bordas verticais das colunas
+        doc.setDrawColor(210, 210, 210);
+        doc.setLineWidth(0.1);
+        for (const key of Object.keys(col)) {
+            doc.line(colX[key], y, colX[key], y + h);
+        }
+        doc.line(margin + tableWidth, y, margin + tableWidth, y + h);
+
+        // Borda horizontal inferior
+        doc.setDrawColor(200, 200, 200);
         doc.setLineWidth(0.2);
         doc.line(margin, y + h, margin + tableWidth, y + h);
 
         return y + h;
     }
 
-    function desenharRodapeGrupo(y, valorTotal) {
-        doc.setFillColor(240, 240, 240);
+    // ── Total do grupo — flutuante à esquerda ─────────────────────────────────
+    function desenharTotalGrupo(y, valorTotal) {
+        y += 3;
+        doc.setFontSize(10);
         doc.setFont(undefined, 'bold');
-        doc.setFontSize(8);
-        doc.rect(margin, y, tableWidth, 7, 'FD');
         doc.setTextColor(0, 0, 0);
-        const labelX = margin + tableWidth - colW.vtotal - colW.vunit - 3;
-        doc.text('VALOR TOTAL DO GRUPO:', labelX, y + 4.8, { align: 'right' });
-        doc.text(fmtValor(valorTotal), margin + tableWidth - 1.5, y + 4.8, { align: 'right' });
+        const label = 'VALOR TOTAL:';
+        const valor = '  ' + fmtValor(valorTotal);
+        doc.text(label, margin, y);
         doc.setFont(undefined, 'normal');
-        return y + 7;
+        doc.text(valor, margin + doc.getTextWidth(label), y);
+        doc.setFont(undefined, 'normal');
+        return y + 5;
     }
 
     // ══════════════════════════════════════════════════════════════════════════
-    // INÍCIO DA GERAÇÃO
+    // GERAÇÃO
     // ══════════════════════════════════════════════════════════════════════════
     let y = await adicionarCabecalho();
 
@@ -952,20 +1014,20 @@ window.generateInventoryPDF = async function() {
     doc.setFont(undefined, 'bold');
     doc.setTextColor(0, 0, 0);
     doc.text('INVENTÁRIO DE ESTOQUE', pageWidth / 2, y, { align: 'center' });
-    y += 7;
+    y += 6;
 
-    // Data e hora de emissão
-    const agora        = new Date();
-    const dataEmissao  = agora.toLocaleDateString('pt-BR');
-    const horaEmissao  = agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    // Data/hora de emissão
+    const agora       = new Date();
+    const dataEmissao = agora.toLocaleDateString('pt-BR');
+    const horaEmissao = agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     doc.setFontSize(9);
     doc.setFont(undefined, 'normal');
-    doc.setTextColor(80, 80, 80);
+    doc.setTextColor(100, 100, 100);
     doc.text(`Emitido em: ${dataEmissao} às ${horaEmissao}`, pageWidth / 2, y, { align: 'center' });
-    y += 10;
+    y += 8;
     doc.setTextColor(0, 0, 0);
 
-    // ── Agrupar produtos ──────────────────────────────────────────────────────
+    // Agrupar produtos
     const porGrupo = {};
     todosProdutos.forEach(p => {
         const g = p.grupo_nome || 'SEM GRUPO';
@@ -973,69 +1035,66 @@ window.generateInventoryPDF = async function() {
         porGrupo[g].push(p);
     });
 
-    let valorTotalGeral    = 0;
-    let quantidadeGeral    = 0;
-    let produtosGeral      = 0;
+    let valorTotalGeral = 0;
 
-    const gruposOrdenados = Object.keys(porGrupo).sort();
-
-    for (const grupoNome of gruposOrdenados) {
+    for (const grupoNome of Object.keys(porGrupo).sort()) {
         const prods = porGrupo[grupoNome].sort((a, b) => (a.codigo || 0) - (b.codigo || 0));
 
-        // Verificar espaço para título + cabeçalho + pelo menos 1 linha
-        if (paginaCheia(y, rowH * 3 + 16)) { y = await addPageWithHeader(); }
+        if (paginaCheia(y, rowH * 3 + 20)) { y = await addPageWithHeader(); }
 
-        // Título do grupo
+        // Nome do grupo
         doc.setFontSize(10);
         doc.setFont(undefined, 'bold');
-        doc.setTextColor(255, 82, 29);  // #ff521d
+        doc.setTextColor(255, 82, 29);
         doc.text(grupoNome.toUpperCase(), margin, y);
         doc.setTextColor(0, 0, 0);
-        y += 6;
+        y += 5;
 
         // Cabeçalho da tabela
         y = desenharCabecalhoTabela(y);
 
-        // Linhas de produto
+        // Linhas de produtos
         for (let idx = 0; idx < prods.length; idx++) {
             const p = prods[idx];
-            const descLines  = doc.splitTextToSize(p.descricao || '-', colW.descricao - 3);
-            const marcaLines = doc.splitTextToSize(p.marca || '-', colW.marca - 2);
-            const modLines   = doc.splitTextToSize(p.codigo_fornecedor || '-', colW.modelo - 2);
-            const nLines     = Math.max(descLines.length, marcaLines.length, modLines.length, 1);
-            const h          = Math.max(rowH, nLines * 3.5 + 3);
+            const dl = doc.splitTextToSize(p.descricao || '-', col.descricao - 3);
+            const ml = doc.splitTextToSize(p.marca || '-', col.marca - 3);
+            const ol = doc.splitTextToSize(p.codigo_fornecedor || '-', col.modelo - 3);
+            const nL = Math.max(dl.length, ml.length, ol.length, 1);
+            const h  = Math.max(rowH, nL * 3.5 + 3);
 
-            if (paginaCheia(y, h + 10)) {
+            if (paginaCheia(y, h + 12)) {
                 y = await addPageWithHeader();
                 y = desenharCabecalhoTabela(y);
             }
             y = desenharLinhaItem(p, y, idx);
         }
 
-        // Totais do grupo
+        // Total do grupo — à esquerda, logo abaixo da tabela
         const valorGrupo = prods.reduce((s, p) => s + (p.quantidade || 0) * parseFloat(p.valor_unitario || 0), 0);
-        valorTotalGeral  += valorGrupo;
-        quantidadeGeral  += prods.reduce((s, p) => s + (p.quantidade || 0), 0);
-        produtosGeral    += prods.length;
+        valorTotalGeral += valorGrupo;
 
-        if (paginaCheia(y, 10)) { y = await addPageWithHeader(); }
-        y = desenharRodapeGrupo(y, valorGrupo);
-        y += 10;
+        if (paginaCheia(y, 12)) { y = await addPageWithHeader(); }
+        y = desenharTotalGrupo(y, valorGrupo);
+        y += 6;
     }
 
-    // ── Total Geral Final ─────────────────────────────────────────────────────
-    if (paginaCheia(y, 22)) { y = await addPageWithHeader(); }
+    // ── TOTAL ESTOQUE — ao final de todas as tabelas ──────────────────────────
+    if (paginaCheia(y, 14)) { y = await addPageWithHeader(); }
 
-    doc.setFillColor(60, 60, 60);
+    // Linha separadora antes do total geral
+    doc.setDrawColor(180, 180, 180);
+    doc.setLineWidth(0.5);
+    doc.line(margin, y, margin + tableWidth, y);
+    y += 5;
+
+    doc.setFontSize(11);
     doc.setFont(undefined, 'bold');
-    doc.setFontSize(9);
-    doc.rect(margin, y, tableWidth, 9, 'FD');
-    doc.setTextColor(255, 255, 255);
-    doc.text(`TOTAL GERAL — ${produtosGeral} produto(s) | Qtd total: ${quantidadeGeral}`,
-             margin + 3, y + 5.8);
-    doc.text(fmtValor(valorTotalGeral), margin + tableWidth - 1.5, y + 5.8, { align: 'right' });
     doc.setTextColor(0, 0, 0);
+    const labelTotal = 'TOTAL ESTOQUE:';
+    const valorTotal = '  ' + fmtValor(valorTotalGeral);
+    doc.text(labelTotal, margin, y);
     doc.setFont(undefined, 'normal');
+    doc.text(valorTotal, margin + doc.getTextWidth(labelTotal), y);
 
     const dateStr = agora.toISOString().split('T')[0];
     doc.save(`Inventario_Estoque_${dateStr}.pdf`);
