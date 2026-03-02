@@ -759,79 +759,287 @@ window.processarSaida = async function(event) {
 
 // ─── PDF ──────────────────────────────────────────────────────────────────────
 
-window.generateInventoryPDF = function() {
+window.generateInventoryPDF = async function() {
     if (!state.produtos.length) { showMessage('Nenhum produto para gerar relatório', 'error'); return; }
 
+    // Se há filtro de grupo ativo, buscar TODOS os produtos de todos os grupos para o PDF
+    let todosProdutos = state.produtos;
+    if (state.grupoCodigo !== null || state.searchTerm) {
+        // Buscar sem filtro para ter inventário completo
+        try {
+            const res = await fetchWithTimeout(`${API_URL}/estoque?page=1&limit=9999`, { method: 'GET', headers: getHeaders() });
+            if (res.ok) {
+                const result = await res.json();
+                todosProdutos = result.data || state.produtos;
+            }
+        } catch(e) { todosProdutos = state.produtos; }
+    }
+
     const { jsPDF } = window.jspdf;
-    const doc = new jsPDF('landscape');
+    const doc       = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
 
-    doc.setFontSize(18); doc.setFont(undefined, 'bold');
-    doc.text('RELATÓRIO DE ESTOQUE', 148, 15, { align: 'center' });
-    doc.setFontSize(10); doc.setFont(undefined, 'normal');
-    doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, 148, 22, { align: 'center' });
+    const pageWidth  = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin     = 14;
+    const maxWidth   = pageWidth - margin * 2;
+    const lineHeight = 5.5;
 
+    // ── Utilitários ───────────────────────────────────────────────────────────
+    const fmtValor = (v) => 'R$ ' + (parseFloat(v) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    const footerMargin = 15; // margem inferior simples, sem rodapé de empresa
+
+    // ── Cabeçalho por página (igual ao PDF Proposta de Pregões) ───────────────
+    function adicionarCabecalho() {
+        return new Promise((resolve) => {
+            const headerY   = 8;
+            const logoWidth = 40;
+            const logoHeight= 18;
+
+            const img = new Image();
+            img.onload = () => {
+                doc.addImage(img, 'PNG', margin, headerY, logoWidth, logoHeight);
+
+                const textX      = margin + logoWidth + 6;
+                const lineSpacing= 6;
+                const textY1     = headerY + 6;
+                const textY2     = textY1 + lineSpacing;
+
+                doc.setTextColor(0, 0, 0);
+                doc.setFontSize(12);
+                doc.setFont(undefined, 'bold');
+                doc.text('I.R. COMÉRCIO E', textX, textY1);
+                doc.text('MATERIAIS ELÉTRICOS LTDA', textX, textY2);
+
+                doc.setTextColor(0, 0, 0);
+                doc.setFontSize(10);
+                doc.setFont(undefined, 'normal');
+                doc.setDrawColor(0, 0, 0);
+                doc.setLineWidth(0.2);
+
+                resolve(headerY + logoHeight + 8);
+            };
+            img.onerror = () => {
+                // sem logo: só linha separadora
+                doc.setDrawColor(0, 0, 0);
+                doc.setLineWidth(0.5);
+                doc.line(margin, headerY + logoHeight, pageWidth - margin, headerY + logoHeight);
+                doc.setLineWidth(0.2);
+                resolve(headerY + logoHeight + 8);
+            };
+            img.src = 'I.R.-COMERCIO-E-MATERIAIS-ELETRICOS-PRETO.png';
+        });
+    }
+
+    async function addPageWithHeader() {
+        doc.addPage();
+        return await adicionarCabecalho();
+    }
+
+    function paginaCheia(yAtual, espaco = 30) {
+        return yAtual > pageHeight - footerMargin - espaco;
+    }
+
+    // ── Cabeçalho tabela por grupo ────────────────────────────────────────────
+    const tableWidth = maxWidth;
+    // Colunas: Código | Marca | Modelo | NCM | Descrição | Un | Qtd | V.Unit | V.Total
+    const colW = {
+        codigo:    tableWidth * 0.07,
+        marca:     tableWidth * 0.10,
+        modelo:    tableWidth * 0.10,
+        ncm:       tableWidth * 0.08,
+        descricao: tableWidth * 0.30,
+        unidade:   tableWidth * 0.05,
+        qtd:       tableWidth * 0.06,
+        vunit:     tableWidth * 0.12,
+        vtotal:    tableWidth * 0.12
+    };
+    const rowH = 8;
+
+    function desenharCabecalhoTabela(y) {
+        doc.setFillColor(108, 117, 125);
+        doc.setDrawColor(150, 150, 150);
+        doc.rect(margin, y, tableWidth, rowH, 'FD');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(7.5);
+        doc.setFont(undefined, 'bold');
+        let xp = margin;
+        const cols = [
+            ['CÓD.', colW.codigo], ['MARCA', colW.marca], ['MODELO', colW.modelo],
+            ['NCM', colW.ncm], ['DESCRIÇÃO', colW.descricao], ['UN', colW.unidade],
+            ['QTD', colW.qtd], ['V. UNIT.', colW.vunit], ['V. TOTAL', colW.vtotal]
+        ];
+        cols.forEach(([lbl, w]) => {
+            doc.line(xp, y, xp, y + rowH);
+            doc.text(lbl, xp + w / 2, y + 5.2, { align: 'center' });
+            xp += w;
+        });
+        doc.line(xp, y, xp, y + rowH);
+        doc.setTextColor(0, 0, 0);
+        doc.setFontSize(7.5);
+        doc.setFont(undefined, 'normal');
+        return y + rowH;
+    }
+
+    function desenharLinhaItem(p, y, rowIndex) {
+        const descLines  = doc.splitTextToSize(p.descricao || '-', colW.descricao - 3);
+        const marcaLines = doc.splitTextToSize(p.marca || '-', colW.marca - 2);
+        const modLines   = doc.splitTextToSize(p.codigo_fornecedor || '-', colW.modelo - 2);
+        const nLines     = Math.max(descLines.length, marcaLines.length, modLines.length, 1);
+        const h          = Math.max(rowH, nLines * 3.5 + 3);
+
+        // Fundo alternado
+        if (rowIndex % 2 === 0) {
+            doc.setFillColor(250, 250, 250);
+            doc.rect(margin, y, tableWidth, h, 'F');
+        }
+        doc.setDrawColor(220, 220, 220);
+        doc.setLineWidth(0.1);
+
+        const cy = y + (h / 2) + 1.5; // centro vertical para textos de 1 linha
+        doc.setFontSize(7.5);
+        doc.setFont(undefined, 'normal');
+        doc.setTextColor(26, 26, 26);
+
+        let xp = margin;
+        // Código
+        doc.text(String(p.codigo || ''), xp + colW.codigo / 2, cy, { align: 'center' }); xp += colW.codigo;
+        // Marca (wrap)
+        marcaLines.forEach((l, i) => doc.text(l, xp + 1.5, y + 3.5 + i * 3.5));          xp += colW.marca;
+        // Modelo (wrap)
+        modLines.forEach((l, i) => doc.text(l, xp + 1.5, y + 3.5 + i * 3.5));             xp += colW.modelo;
+        // NCM
+        doc.text(p.ncm || '-', xp + colW.ncm / 2, cy, { align: 'center' });               xp += colW.ncm;
+        // Descrição (wrap)
+        descLines.forEach((l, i) => doc.text(l, xp + 1.5, y + 3.5 + i * 3.5));            xp += colW.descricao;
+        // Unidade
+        doc.text(p.unidade || 'UN', xp + colW.unidade / 2, cy, { align: 'center' });       xp += colW.unidade;
+        // Quantidade
+        doc.text(String(p.quantidade || 0), xp + colW.qtd - 1.5, cy, { align: 'right' });  xp += colW.qtd;
+        // V. Unitário
+        doc.text(fmtValor(p.valor_unitario), xp + colW.vunit - 1.5, cy, { align: 'right' }); xp += colW.vunit;
+        // V. Total
+        const vt = (p.quantidade || 0) * parseFloat(p.valor_unitario || 0);
+        doc.text(fmtValor(vt), xp + colW.vtotal - 1.5, cy, { align: 'right' });
+
+        // Borda inferior
+        doc.setLineWidth(0.2);
+        doc.line(margin, y + h, margin + tableWidth, y + h);
+
+        return y + h;
+    }
+
+    function desenharRodapeGrupo(y, valorTotal) {
+        doc.setFillColor(240, 240, 240);
+        doc.setFont(undefined, 'bold');
+        doc.setFontSize(8);
+        doc.rect(margin, y, tableWidth, 7, 'FD');
+        doc.setTextColor(0, 0, 0);
+        const labelX = margin + tableWidth - colW.vtotal - colW.vunit - 3;
+        doc.text('VALOR TOTAL DO GRUPO:', labelX, y + 4.8, { align: 'right' });
+        doc.text(fmtValor(valorTotal), margin + tableWidth - 1.5, y + 4.8, { align: 'right' });
+        doc.setFont(undefined, 'normal');
+        return y + 7;
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // INÍCIO DA GERAÇÃO
+    // ══════════════════════════════════════════════════════════════════════════
+    let y = await adicionarCabecalho();
+
+    // Título
+    doc.setFontSize(16);
+    doc.setFont(undefined, 'bold');
+    doc.setTextColor(0, 0, 0);
+    doc.text('INVENTÁRIO DE ESTOQUE', pageWidth / 2, y, { align: 'center' });
+    y += 7;
+
+    // Data e hora de emissão
+    const agora        = new Date();
+    const dataEmissao  = agora.toLocaleDateString('pt-BR');
+    const horaEmissao  = agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    doc.setFontSize(9);
+    doc.setFont(undefined, 'normal');
+    doc.setTextColor(80, 80, 80);
+    doc.text(`Emitido em: ${dataEmissao} às ${horaEmissao}`, pageWidth / 2, y, { align: 'center' });
+    y += 10;
+    doc.setTextColor(0, 0, 0);
+
+    // ── Agrupar produtos ──────────────────────────────────────────────────────
     const porGrupo = {};
-    state.produtos.forEach(p => {
+    todosProdutos.forEach(p => {
         const g = p.grupo_nome || 'SEM GRUPO';
         if (!porGrupo[g]) porGrupo[g] = [];
         porGrupo[g].push(p);
     });
 
-    let startY = 30, valorTotalGeral = 0, quantidadeTotalGeral = 0;
+    let valorTotalGeral    = 0;
+    let quantidadeGeral    = 0;
+    let produtosGeral      = 0;
 
-    Object.keys(porGrupo).sort().forEach(grupoNome => {
-        if (startY > 170) { doc.addPage(); startY = 15; }
+    const gruposOrdenados = Object.keys(porGrupo).sort();
 
-        doc.setFontSize(14); doc.setFont(undefined, 'bold');
-        doc.setTextColor(204, 112, 0);
-        doc.text(grupoNome, 14, startY);
-        startY += 8;
+    for (const grupoNome of gruposOrdenados) {
+        const prods = porGrupo[grupoNome].sort((a, b) => (a.codigo || 0) - (b.codigo || 0));
 
-        const prods = porGrupo[grupoNome].sort((a, b) => a.codigo - b.codigo);
+        // Verificar espaço para título + cabeçalho + pelo menos 1 linha
+        if (paginaCheia(y, rowH * 3 + 16)) { y = await addPageWithHeader(); }
 
-        doc.autoTable({
-            startY,
-            head: [['Código', 'Marca', 'Modelo', 'NCM', 'Descrição', 'Un.', 'Qtd', 'Valor Un.', 'Valor Total']],
-            body: prods.map(p => [
-                p.codigo.toString(), p.marca, p.codigo_fornecedor, p.ncm || '-', p.descricao,
-                p.unidade || 'UN', p.quantidade.toString(),
-                `R$ ${parseFloat(p.valor_unitario).toFixed(2)}`,
-                `R$ ${(p.quantidade * parseFloat(p.valor_unitario)).toFixed(2)}`
-            ]),
-            theme: 'grid',
-            headStyles: { fillColor: [107,114,128], textColor: [255,255,255], fontSize: 8, fontStyle: 'bold' },
-            bodyStyles: { fontSize: 7, textColor: [26,26,26] },
-            alternateRowStyles: { fillColor: [250,250,250] },
-            columnStyles: {
-                0:{cellWidth:18}, 1:{cellWidth:22}, 2:{cellWidth:22}, 3:{cellWidth:18},
-                4:{cellWidth:80}, 5:{cellWidth:12,halign:'center'},
-                6:{cellWidth:15,halign:'center'}, 7:{cellWidth:25,halign:'right'}, 8:{cellWidth:28,halign:'right'}
-            },
-            margin: { left: 14, right: 14 }
-        });
+        // Título do grupo
+        doc.setFontSize(10);
+        doc.setFont(undefined, 'bold');
+        doc.setTextColor(255, 82, 29);  // #ff521d
+        doc.text(grupoNome.toUpperCase(), margin, y);
+        doc.setTextColor(0, 0, 0);
+        y += 6;
 
-        startY = doc.lastAutoTable.finalY + 8;
-        const qtd = prods.reduce((a, p) => a + p.quantidade, 0);
-        const val = prods.reduce((a, p) => a + p.quantidade * parseFloat(p.valor_unitario), 0);
-        quantidadeTotalGeral += qtd;
-        valorTotalGeral      += val;
+        // Cabeçalho da tabela
+        y = desenharCabecalhoTabela(y);
 
-        doc.setFontSize(10); doc.setFont(undefined, 'bold'); doc.setTextColor(0,0,0);
-        doc.text(`Total de Itens: ${prods.length}`, 14, startY); startY += 6;
-        doc.text(`Quantidade Total: ${qtd}`,        14, startY); startY += 6;
-        doc.text(`Valor Total: R$ ${val.toFixed(2)}`, 14, startY); startY += 12;
-    });
+        // Linhas de produto
+        for (let idx = 0; idx < prods.length; idx++) {
+            const p = prods[idx];
+            const descLines  = doc.splitTextToSize(p.descricao || '-', colW.descricao - 3);
+            const marcaLines = doc.splitTextToSize(p.marca || '-', colW.marca - 2);
+            const modLines   = doc.splitTextToSize(p.codigo_fornecedor || '-', colW.modelo - 2);
+            const nLines     = Math.max(descLines.length, marcaLines.length, modLines.length, 1);
+            const h          = Math.max(rowH, nLines * 3.5 + 3);
 
-    if (startY > 160) { doc.addPage(); startY = 15; }
-    doc.setFontSize(14); doc.setFont(undefined, 'bold');
-    doc.text('TOTAIS GERAIS:', 14, startY); startY += 10;
-    doc.setFontSize(11); doc.setFont(undefined, 'normal');
-    doc.text(`Total de Produtos: ${state.produtos.length}`, 14, startY); startY += 7;
-    doc.text(`Quantidade Total: ${quantidadeTotalGeral}`,   14, startY); startY += 7;
-    doc.text(`Valor Total em Estoque: R$ ${valorTotalGeral.toFixed(2)}`, 14, startY);
+            if (paginaCheia(y, h + 10)) {
+                y = await addPageWithHeader();
+                y = desenharCabecalhoTabela(y);
+            }
+            y = desenharLinhaItem(p, y, idx);
+        }
 
-    doc.save(`Relatorio_Estoque_${new Date().toISOString().split('T')[0]}.pdf`);
-    showMessage('Relatório PDF gerado com sucesso!', 'success');
+        // Totais do grupo
+        const valorGrupo = prods.reduce((s, p) => s + (p.quantidade || 0) * parseFloat(p.valor_unitario || 0), 0);
+        valorTotalGeral  += valorGrupo;
+        quantidadeGeral  += prods.reduce((s, p) => s + (p.quantidade || 0), 0);
+        produtosGeral    += prods.length;
+
+        if (paginaCheia(y, 10)) { y = await addPageWithHeader(); }
+        y = desenharRodapeGrupo(y, valorGrupo);
+        y += 10;
+    }
+
+    // ── Total Geral Final ─────────────────────────────────────────────────────
+    if (paginaCheia(y, 22)) { y = await addPageWithHeader(); }
+
+    doc.setFillColor(60, 60, 60);
+    doc.setFont(undefined, 'bold');
+    doc.setFontSize(9);
+    doc.rect(margin, y, tableWidth, 9, 'FD');
+    doc.setTextColor(255, 255, 255);
+    doc.text(`TOTAL GERAL — ${produtosGeral} produto(s) | Qtd total: ${quantidadeGeral}`,
+             margin + 3, y + 5.8);
+    doc.text(fmtValor(valorTotalGeral), margin + tableWidth - 1.5, y + 5.8, { align: 'right' });
+    doc.setTextColor(0, 0, 0);
+    doc.setFont(undefined, 'normal');
+
+    const dateStr = agora.toISOString().split('T')[0];
+    doc.save(`Inventario_Estoque_${dateStr}.pdf`);
+    showMessage('Inventário PDF gerado com sucesso!', 'success');
 };
 
 // ─── UTILS ────────────────────────────────────────────────────────────────────
