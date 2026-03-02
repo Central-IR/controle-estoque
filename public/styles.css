@@ -1,6 +1,6 @@
 /* VARIÁVEIS BASE - IDÊNTICAS AO SISTEMA PRINCIPAL */
 :root {
-    --primary: #CC7000;
+    --primary: #ff521d;
     --bg-primary: #FFFFFF;
     --bg-secondary: #F8F9FA;
     --bg-card: #FFFFFF;
@@ -9,7 +9,7 @@
     --border-color: #E5E7EB;
     --input-bg: #F9FAFB;
     --success-color: #22C55E;
-    --warning-color: #F59E0B;
+    --warning-color: #ff521d;
     --info-color: #3B82F6;
     --table-stripe: #FAFAFA;
     --table-hover: rgba(0, 0, 0, 0.02);
@@ -21,7 +21,7 @@
     --btn-register: #3B82F6;
     --btn-delete: #EF4444;
     --btn-edit: #6B7280;
-    --btn-view: #F59E0B;
+    --btn-view: #ff521d;
     --btn-save: #22C55E;
     --alert-color: #EF4444;
 }
@@ -33,7 +33,7 @@
         --bg-card: #1A1A1A;
         --text-primary: #FFFFFF;
         --text-secondary: #A0A0A0;
-        --border-color: rgba(204, 112, 0, 0.08);
+        --border-color: rgba(255, 82, 29, 0.08);
         --input-bg: #2A2A2A;
         --table-stripe: #1F1F1F;
         --card-shadow: none;
@@ -63,8 +63,8 @@ body {
 .loader {
     width: 48px;
     height: 48px;
-    border: 4px solid rgba(204, 112, 0, 0.2);
-    border-top-color: #CC7000;
+    border: 4px solid rgba(255, 82, 29, 0.2);
+    border-top-color: #ff521d;
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
 }
@@ -234,7 +234,7 @@ h3 {
 
 .brand-button:hover {
     border-color: var(--primary);
-    background: rgba(204, 112, 0, 0.05);
+    background: rgba(255, 82, 29, 0.05);
 }
 
 .brand-button.active {
@@ -913,7 +913,7 @@ button.small {
     transition: all 0.15s ease;
     margin: 0;
 }
-.pag-btn:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); background: rgba(204,112,0,0.05); transform: none; opacity: 1; }
+.pag-btn:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); background: rgba(255,82,29,0.05); transform: none; opacity: 1; }
 .pag-btn-active { background: var(--primary) !important; color: #fff !important; border-color: var(--primary) !important; }
 .pag-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 .pag-nav { font-size: 1rem; font-weight: 700; }
@@ -933,7 +933,7 @@ button.small {
 .brand-button-manage:hover {
     border-color: var(--primary) !important;
     color: var(--primary) !important;
-    background: rgba(204,112,0,0.05) !important;
+    background: rgba(255,82,29,0.05) !important;
 }
 
 /* ─── MODAL EXCLUIR GRUPO ───────────────────────────────────────────────────── */
