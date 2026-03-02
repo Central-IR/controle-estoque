@@ -787,56 +787,55 @@ window.generateInventoryPDF = async function() {
         minimumFractionDigits: 2, maximumFractionDigits: 2
     });
 
-    // ── Cabeçalho: logo + nome empresa (idêntico ao da imagem) ────────────────
+    // ── Cabeçalho: logo + nome empresa (idêntico ao PDF de referência) ─────────
     function adicionarCabecalho() {
         return new Promise((resolve) => {
-            const headerY    = 8;
-            const logoW      = 30;   // largura do logo IR
-            const logoH      = 22;   // altura do logo IR
-            const sepY       = headerY + logoH + 4; // linha separadora
+            const headerY = 3;
+            const logoX   = 5;
+            const logoW   = 40;
 
             const img = new Image();
             img.onload = () => {
-                // Logo
-                doc.addImage(img, 'PNG', margin, headerY, logoW, logoH);
+                const logoH    = (img.height / img.width) * logoW;
 
-                // Nome da empresa ao lado do logo — cor cinza como na imagem
-                const textX = margin + logoW + 7;
-                doc.setTextColor(140, 140, 140);   // cinza médio igual à imagem
-                doc.setFontSize(11);
+                // Logo com opacidade 0.3 — igual ao PDF de referência
+                doc.setGState(new doc.GState({ opacity: 0.3 }));
+                doc.addImage(img, 'PNG', logoX, headerY, logoW, logoH);
+                doc.setGState(new doc.GState({ opacity: 1.0 }));
+
+                // Tamanho de fonte derivado da altura do logo — igual ao PDF de referência
+                const fontSize    = logoH * 0.5;
+                const lineSpacing = fontSize * 0.5;
+                const textX       = logoX + logoW + 1.2;
+                const textY1      = headerY + fontSize * 0.85;
+                const textY2      = textY1 + lineSpacing;
+
+                doc.setFontSize(fontSize);
                 doc.setFont(undefined, 'bold');
-                doc.text('I.R COMÉRCIO E',          textX, headerY + 9);
-                doc.text('MATERIAIS ELÉTRICOS LTDA', textX, headerY + 16);
-
-                // Linha separadora horizontal abaixo do cabeçalho
-                doc.setDrawColor(200, 200, 200);
-                doc.setLineWidth(0.4);
-                doc.line(margin, sepY, pageWidth - margin, sepY);
+                doc.setTextColor(150, 150, 150);
+                doc.text('I.R COMÉRCIO E',           textX, textY1);
+                doc.text('MATERIAIS ELÉTRICOS LTDA', textX, textY2);
 
                 // Reset
                 doc.setTextColor(0, 0, 0);
+                doc.setFontSize(10);
+                doc.setFont(undefined, 'normal');
                 doc.setDrawColor(0, 0, 0);
                 doc.setLineWidth(0.2);
-                doc.setFont(undefined, 'normal');
 
-                resolve(sepY + 6);
+                resolve(headerY + logoH + 8);
             };
             img.onerror = () => {
-                // Fallback sem logo
-                doc.setTextColor(140, 140, 140);
+                // Fallback: só texto cinza
                 doc.setFontSize(11);
                 doc.setFont(undefined, 'bold');
-                doc.text('I.R COMÉRCIO E MATERIAIS ELÉTRICOS LTDA', margin, headerY + 10);
-                doc.setDrawColor(200, 200, 200);
-                doc.setLineWidth(0.4);
-                doc.line(margin, sepY, pageWidth - margin, sepY);
+                doc.setTextColor(150, 150, 150);
+                doc.text('I.R COMÉRCIO E MATERIAIS ELÉTRICOS LTDA', logoX + logoW + 1.2, headerY + 10);
                 doc.setTextColor(0, 0, 0);
-                doc.setDrawColor(0, 0, 0);
-                doc.setLineWidth(0.2);
                 doc.setFont(undefined, 'normal');
-                resolve(sepY + 6);
+                resolve(headerY + 18 + 8);
             };
-            img.src = 'I.R.-COMERCIO-E-MATERIAIS-ELETRICOS-PRETO.png';
+            img.src = 'I.R.-COMERCIO-E-MATERIAIS-ELETRICOS-LTDA-PDF.png';
         });
     }
 
@@ -991,17 +990,16 @@ window.generateInventoryPDF = async function() {
 
     // ── Total do grupo — flutuante à esquerda ─────────────────────────────────
     function desenharTotalGrupo(y, valorTotal) {
-        y += 3;
+        y += 6;   // espaço generoso entre a última linha da tabela e o total
         doc.setFontSize(10);
         doc.setFont(undefined, 'bold');
         doc.setTextColor(0, 0, 0);
         const label = 'VALOR TOTAL:';
-        const valor = '  ' + fmtValor(valorTotal);
         doc.text(label, margin, y);
         doc.setFont(undefined, 'normal');
-        doc.text(valor, margin + doc.getTextWidth(label), y);
+        doc.text(' ' + fmtValor(valorTotal), margin + doc.getTextWidth(label), y);
         doc.setFont(undefined, 'normal');
-        return y + 5;
+        return y + 7;   // espaço após o total antes do próximo grupo
     }
 
     // ══════════════════════════════════════════════════════════════════════════
